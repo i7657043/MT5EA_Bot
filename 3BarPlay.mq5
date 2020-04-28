@@ -15,6 +15,9 @@ int movingAverageHandler; // handle for our Moving Average indicator
 double movingAverages[];  // Dynamic array to hold the values of Moving Average for each bars
 int STP, TKP;             // To be used for Stop Loss & Take Profit values
 
+bool positionTakenThisBar=false;
+bool isNewBar = false;
+
 int OnInit()
 {
   //--- Get the handle for Moving Average indicator
@@ -26,8 +29,8 @@ int OnInit()
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
   }
 
-  STP = (int)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
-  TKP = (int)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+  STP = 25;
+  TKP = 50;
 
   //if (_Digits == 5 || _Digits == 3)
   //{
@@ -59,9 +62,6 @@ void OnTick()
   static datetime oldTime;
   datetime newTime[1];
 
-  bool isNewBar = false;
-  bool positionTakenThisBar=false;
-
   // copying the last bar time to the element newTime[0]
   int copied = CopyTime(_Symbol, _Period, 0, 1, newTime);
   if (copied > 0) // ok, the data has been copied successfully
@@ -79,6 +79,11 @@ void OnTick()
     Alert("Error in copying historical times data, error =", GetLastError());
     ResetLastError();
     return;
+  }
+  
+  if (isNewBar == true)
+  {
+   positionTakenThisBar=false;  
   }
 
   //--- EA should only check for new trade if we have a new bar
@@ -195,57 +200,65 @@ void OnTick()
   // previous price closed below MA-8
   //bool sellCondition1 = (latestPriceDetails.ask < movingAverages[1]);
 
-  bool buyCondition1 = CheckForShort3BarPlay(barDetails);
+  // bool buyCondition1 = CheckForShort3BarPlay(barDetails);
 
-  if (sellCondition1 && positionTakenThisBar == false)
-  {
-    // any already opened Sell position?
-    //if (sell_opened)
-    //{
-    //  Alert("We already have a Sell Position!!!");
-    //  return; // Don't open a new Sell Position
-    //}
+  // if (sellCondition1 && positionTakenThisBar == false)
+  // {
+  //   // any already opened Sell position?
+  //   //if (sell_opened)
+  //   //{
+  //   //  Alert("We already have a Sell Position!!!");
+  //   //  return; // Don't open a new Sell Position
+  //   //}
 
-    tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, ask);
+  //   tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, ask);
 
-    if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
-    {
-      Alert("A Sell order at ask price:", ask, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
-      Sleep(10000);
-    }
-    else
-    {
-      Alert("The Sell order request could not be completed -error:", GetLastError());
-      ResetLastError();
-      return;
-    }
+  //   if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
+  //   {
+  //     Alert("A Sell order at ask price:", ask, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
+  //     Sleep(10000);
+  //   }
+  //   else
+  //   {
+  //     Alert("The Sell order request could not be completed -error:", GetLastError());
+  //     ResetLastError();
+  //     return;
+  //   }
 
-    positionTakenThisBar = true;
-  }
+  //   positionTakenThisBar = true;
+  // }
 }
 
-bool CheckForLong3BarPlay(MqlRates barDetails[])
+bool CheckForLong3BarPlay(MqlRates &barDetails[])
 {
   double firstLargeGreenBarDistance = barDetails[2].close - barDetails[2].open;
   double secondBabyRedBarDistance = barDetails[1].open - barDetails[1].close;
   double thirdLargeGreenBarDistance = barDetails[0].close - barDetails[0].open;  
+  
+  if (firstLargeGreenBarDistance == 0 || secondBabyRedBarDistance == 0)
+  {
+   return false;
+  }
+  
+  double a = firstLargeGreenBarDistance / 5;
+  double ans = barDetails[2].close - (firstLargeGreenBarDistance / 5);
 
-  return firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5) && 
-  barDetails[1].close <= (barDetails[2].close - (firstLargeGreenBarDistance / 5))  &&
+  bool result = firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5) && 
+  barDetails[2].close > barDetails[2].open &&
+  barDetails[1].close < barDetails[1].open &&
+  barDetails[0].close > barDetails[0].open &&  
+  barDetails[2].open < barDetails[1].close && barDetails[0].close > barDetails[1].open &&
+  barDetails[1].close <= (barDetails[2].close - (firstLargeGreenBarDistance / 5)) &&
   barDetails[1].open <= (barDetails[0].open + (thirdLargeGreenBarDistance / 5))  &&
+  barDetails[1].open <= (barDetails[0].close - (thirdLargeGreenBarDistance / 3))  &&
   thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2);
-}
-
-bool CheckForShort3BarPlay(MqlRates barDetails[])
-{
-  double firstLargeGreenBarDistance = barDetails[2].open - barDetails[2].close;
-  double secondBabyRedBarDistance = barDetails[1].close - barDetails[1].open;
-  double thirdLargeGreenBarDistance = barDetails[0].open - barDetails[0].close;  
-
-  return firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5) && 
-  barDetails[1].open <= (barDetails[2].open - (firstLargeGreenBarDistance / 5))  &&
-  barDetails[1].close <= (barDetails[0].close + (thirdLargeGreenBarDistance / 5))  &&
-  thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2);
+  
+  if (result == true)
+  {
+   Alert("Three bar here");
+  }  
+  
+  return result;
 }
 
 MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, double ask)
