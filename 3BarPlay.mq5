@@ -17,6 +17,7 @@ int STP, TKP;             // To be used for Stop Loss & Take Profit values
 
 bool positionTakenThisBar=false;
 bool isNewBar = false;
+string currentTime="";
 
 int OnInit()
 {
@@ -29,8 +30,8 @@ int OnInit()
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
   }
 
-  STP = 25;
-  TKP = 50;
+  STP = 45;
+  TKP = 40;
 
   //if (_Digits == 5 || _Digits == 3)
   //{
@@ -61,7 +62,7 @@ void OnTick()
   // If the bar time isn't equal to the saved time, it indicates that we have a new tick.
   static datetime oldTime;
   datetime newTime[1];
-
+  
   // copying the last bar time to the element newTime[0]
   int copied = CopyTime(_Symbol, _Period, 0, 1, newTime);
   if (copied > 0) // ok, the data has been copied successfully
@@ -71,7 +72,8 @@ void OnTick()
       isNewBar = true; // if it isn't a first call, the new bar has appeared
       if (MQL5InfoInteger(MQL5_DEBUGGING))
         Print("We have new bar here ", newTime[0], " old time was ", oldTime);
-      oldTime = newTime[0]; // saving bar time
+      oldTime = newTime[0]; // saving bar time    
+      currentTime = TimeToString(newTime[0], TIME_DATE|TIME_MINUTES);
     }
   }
   else
@@ -115,13 +117,13 @@ void OnTick()
     return;
   }
 
-  //--- Get the details of the latest 3 bars and MA
-  if (CopyRates(_Symbol, _Period, 0, 3, barDetails) < 0)
+  //--- Get the details of the latest 4 bars and MA
+  if (CopyRates(_Symbol, _Period, 0, 4, barDetails) < 0)
   {
     Alert("Error copying rates/history data - error:", GetLastError(), "!!");
     return;
   }
-  if (CopyBuffer(movingAverageHandler, 0, 0, 3, movingAverages) < 0)
+  if (CopyBuffer(movingAverageHandler, 0, 0, 4, movingAverages) < 0)
   {
     Alert("Error copying Moving Average indicator buffer - error:", GetLastError());
     return;
@@ -150,18 +152,18 @@ void OnTick()
   int spread = (int)MathRound((ask - bid) / SymbolInfoDouble(Symbol(), SYMBOL_POINT));
 
   Comment(
-      "Current bar OPEN:" + barDetails[0].open +
-      "\nCurrent bar -1 OPEN:" + barDetails[1].open +
+      "Current bar -1 OPEN:" + barDetails[1].open +
       "\nCurrent bar -2 OPEN:" + barDetails[2].open +
-      "\n\nCurrent bar CLOSE:" + barDetails[0].close +
-      "\nCurrent bar -1 CLOSE:" + barDetails[1].close +
+      "\nCurrent bar -3 OPEN:" + barDetails[3].open +
+      "\n\nCurrent bar -1 CLOSE:" + barDetails[1].close +
       "\nCurrent bar -2 CLOSE:" + barDetails[2].close +
-      "\n\nCurrent bar HIGH:" + barDetails[0].high +
-      "\nCurrent bar -1 HIGH:" + barDetails[1].high +
+      "\nCurrent bar -3 CLOSE:" + barDetails[3].close +
+      "\n\nCurrent bar -1 HIGH:" + barDetails[1].high +
       "\nCurrent bar -2 HIGH:" + barDetails[2].high +
-      "\n\nCurrent bar LOW:" + barDetails[0].low +
-      "\nCurrent bar -1 LOW:" + barDetails[1].low +
+      "\nCurrent bar -3 HIGH:" + barDetails[3].high +
+      "\n\nCurrent bar -1 LOW:" + barDetails[1].low +
       "\nCurrent bar -2 LOW:" + barDetails[2].low +
+      "\nCurrent bar -3 LOW:" + barDetails[3].low +
       "\n\nCurrent Buy Price:" + ask +
       "\nCurrent Sell Price:" + bid +
       "\n\nCurrent Spread:" + spread);
@@ -169,9 +171,7 @@ void OnTick()
   // previous price closed above MA-8
   //bool buyCondition1 = (latestPriceDetails.bid > movingAverages[1]);
 
-  bool buyCondition1 = CheckForLong3BarPlay(barDetails);
-
-  if (buyCondition1 && positionTakenThisBar == false)
+  if (positionTakenThisBar == false && CheckForLong3BarPlay(barDetails))
   {
     // any already opened Buy position?
     //if (buy_opened)
@@ -184,8 +184,8 @@ void OnTick()
 
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
     {
+      positionTakenThisBar = true;
       Alert("A Buy order at bid price: ", bid, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
-      Sleep(10000);
     }
     else
     {
@@ -194,7 +194,7 @@ void OnTick()
       return;
     }
 
-    positionTakenThisBar = true;
+    
   }
 
   // previous price closed below MA-8
@@ -216,7 +216,6 @@ void OnTick()
   //   if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
   //   {
   //     Alert("A Sell order at ask price:", ask, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
-  //     Sleep(10000);
   //   }
   //   else
   //   {
@@ -227,35 +226,85 @@ void OnTick()
 
   //   positionTakenThisBar = true;
   // }
+  
+  isNewBar=false;
 }
 
 bool CheckForLong3BarPlay(MqlRates &barDetails[])
 {
-  double firstLargeGreenBarDistance = barDetails[2].close - barDetails[2].open;
-  double secondBabyRedBarDistance = barDetails[1].open - barDetails[1].close;
-  double thirdLargeGreenBarDistance = barDetails[0].close - barDetails[0].open;  
+  double firstLargeGreenBarDistance = barDetails[3].close - barDetails[3].open;
+  double secondBabyRedBarDistance = barDetails[2].open - barDetails[2].close;
+  double thirdLargeGreenBarDistance = barDetails[1].close - barDetails[1].open;  
   
   if (firstLargeGreenBarDistance == 0 || secondBabyRedBarDistance == 0)
   {
    return false;
   }
+  //For easier debugging of which statement is incorrect
   
-  double a = firstLargeGreenBarDistance / 5;
-  double ans = barDetails[2].close - (firstLargeGreenBarDistance / 5);
-
+  if (currentTime == "2019.06.05 13:22")
+  {
+   Alert("Debugging Time");
+  }
+  
+  if (firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5))
+  {
+   Alert("First Green Bar is 2.5 times the size of the small Red Bar");
+  }
+  if (barDetails[3].close > barDetails[3].open)
+  {
+   Alert("First Bar Green");
+  }
+  if (barDetails[2].close < barDetails[2].open)
+  {
+   Alert("Second Bar Red");
+  }
+  if (barDetails[1].close > barDetails[1].open)
+  {
+   Alert("Third Bar Green");
+  }
+  if (barDetails[3].open < barDetails[2].close)
+  {
+   Alert("");
+  }
+  if (barDetails[1].close > barDetails[2].open)
+  {
+   Alert("");
+  }
+  if (
+  barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / 5)) ||
+  barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / 3)))
+  {
+   Alert("");
+  }
+  if (barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / 5)))
+  {
+   Alert("");
+  }
+  if (barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / 3)))
+  {
+   Alert("");
+  }
+  if (thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2))
+  {
+   Alert("");
+  }
+  
   bool result = firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5) && 
-  barDetails[2].close > barDetails[2].open &&
-  barDetails[1].close < barDetails[1].open &&
-  barDetails[0].close > barDetails[0].open &&  
-  barDetails[2].open < barDetails[1].close && barDetails[0].close > barDetails[1].open &&
-  barDetails[1].close <= (barDetails[2].close - (firstLargeGreenBarDistance / 5)) &&
-  barDetails[1].open <= (barDetails[0].open + (thirdLargeGreenBarDistance / 5))  &&
-  barDetails[1].open <= (barDetails[0].close - (thirdLargeGreenBarDistance / 3))  &&
+  barDetails[3].close > barDetails[3].open &&
+  barDetails[2].close < barDetails[2].open &&
+  barDetails[1].close > barDetails[1].open &&  
+  barDetails[3].open < barDetails[2].close && 
+  barDetails[1].close > barDetails[2].open &&
+  (barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / 5)) || 
+  barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / 3))) &&
+  barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / 5))  &&
+  barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / 3))  &&
   thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2);
   
   if (result == true)
   {
-   Alert("Three bar here");
+   Alert("Three bar play at Current bar -1");
   }  
   
   return result;
