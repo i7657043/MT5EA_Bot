@@ -31,7 +31,7 @@ int OnInit()
   }
 
   STP = 45;
-  TKP = 40;
+  TKP = 60;
 
   //if (_Digits == 5 || _Digits == 3)
   //{
@@ -242,7 +242,7 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[])
   }
   //For easier debugging of which statement is incorrect
   
-  if (currentTime == "2019.06.05 13:22")
+  if (currentTime == "2019.06.05 02:37")
   {
    Alert("Debugging Time");
   }
@@ -289,6 +289,10 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[])
   {
    Alert("");
   }
+  if (barDetails[1].open <= barDetails[2].open)
+  {
+   Alert("");
+  }
   
   bool result = firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5) && 
   barDetails[3].close > barDetails[3].open &&
@@ -300,7 +304,8 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[])
   barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / 3))) &&
   barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / 5))  &&
   barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / 3))  &&
-  thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2);
+  thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2) &&
+  barDetails[1].open <= barDetails[2].open;
   
   if (result == true)
   {
