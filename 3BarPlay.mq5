@@ -30,8 +30,8 @@ int OnInit()
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
   }
 
-  STP = 45;
-  TKP = 60;
+  STP = 40;
+  TKP = 80;
 
   //if (_Digits == 5 || _Digits == 3)
   //{
