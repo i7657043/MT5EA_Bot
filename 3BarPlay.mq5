@@ -4,11 +4,23 @@
 //|                                                             None |
 //+------------------------------------------------------------------+
 //--- input parameters
-input int stopLoss = 30;
-input int takeProfit = 5;
+input int stopLoss = 64;
+input int takeProfit = 113;
 input int movingAveragePeriod = 50;
 input int expertAdvisorMagicNumber = 12345; // EA Magic Number
-input double lotSize = 0.1;                 // lots to Trade
+input double lotSize = 0.1;                 // Lots to Trade
+input double barIntervalThreshold = 6;      // Bar Trade interval
+
+input double mul1=2.5; //Multiplier Value 1
+input double mul2=2; //Multiplier Value 2
+
+input double div1=4; //Division Value 1
+input double div2=3; //Division Value 2
+
+input int strictRule1=1; //Strict Rule 1
+input int strictRule2=1; //Strict Rule 2
+input int strictRule3=1; //Strict Rule 3
+input int strictRule4=1; //Strict Rule 4
 
 //--- Other parameters
 int movingAverageHandler; // handle for our Moving Average indicator
@@ -21,7 +33,7 @@ string currentTime = "";
 
 bool tradeBarCounterActive = 0;
 int barsSinceLastTrade = 0;
-const int barTradeIntervalThreshold = 6;
+int barTradeIntervalThreshold = 0;
 
 int OnInit()
 {
@@ -34,8 +46,10 @@ int OnInit()
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
   }
 
-  STP = 38;
-  TKP = 82;
+  STP = stopLoss;
+  TKP = takeProfit;
+  barTradeIntervalThreshold = barIntervalThreshold;
+  
 
   //if (_Digits == 5 || _Digits == 3)
   //{
@@ -132,13 +146,13 @@ void OnTick()
     return;
   }
 
-  //--- Get the details of the latest 4 bars and MA
-  if (CopyRates(_Symbol, _Period, 0, 4, barDetails) < 0)
+  //--- Get the details of the latest 5 bars and MA
+  if (CopyRates(_Symbol, _Period, 0, 5, barDetails) < 0)
   {
     Alert("Error copying rates/history data - error:", GetLastError(), "!!");
     return;
   }
-  if (CopyBuffer(movingAverageHandler, 0, 0, 4, movingAverages) < 0)
+  if (CopyBuffer(movingAverageHandler, 0, 0, 5, movingAverages) < 0)
   {
     Alert("Error copying Moving Average indicator buffer - error:", GetLastError());
     return;
@@ -249,14 +263,20 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   double firstLargeGreenBarDistance = barDetails[3].close - barDetails[3].open;
   double secondBabyRedBarDistance = barDetails[2].open - barDetails[2].close;
   double thirdLargeGreenBarDistance = barDetails[1].close - barDetails[1].open;
+  double barBeforeFirstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
+  
+  if (barBeforeFirstLargeGreenBarDistance < 0)
+  {
+   barBeforeFirstLargeGreenBarDistance = barDetails[4].open - barDetails[4].close;
+  }
 
-  if (firstLargeGreenBarDistance == 0 || secondBabyRedBarDistance == 0)
+  if (firstLargeGreenBarDistance == 0 || thirdLargeGreenBarDistance == 0)
   {
     return false;
   }
   //For easier debugging of which statement is incorrect
 
-  if (currentTime == "2019.06.05 09:40")
+  if (currentTime == "2019.10.03 05:34")
   {
     Alert("Debugging Time");
   }
@@ -269,7 +289,7 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   // {
   //   Alert("First Bar Green");
   // }
-  // if (barDetails[2].close < barDetails[2].open)
+  // if (barDetails[2].close <= barDetails[2].open)
   // {
   //   Alert("Second Bar Red");
   // }
@@ -312,25 +332,33 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   //   Alert("");
   // }
 
-  bool result = firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5) &&
+  bool result = firstLargeGreenBarDistance > (secondBabyRedBarDistance * mul1) &&
                 barDetails[3].close > barDetails[3].open &&
-                barDetails[2].close < barDetails[2].open &&
+                barDetails[2].close <= barDetails[2].open &&
                 barDetails[1].close > barDetails[1].open &&
                 barDetails[3].open < barDetails[2].close &&
                 barDetails[1].close > barDetails[2].open &&
-                (barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / 5)) ||
-                 barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / 3))) &&
-                barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / 5)) &&
-                barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / 3)) &&
+                (barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / div1)) ||
+                 barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / div2))) &&
+                barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / div1)) &&
+                barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / div2)) &&
                 thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2) &&
-                barDetails[1].open <= barDetails[2].open &&
-                ask > ((barDetails[0].close * _Point) + (2 * _Point));
+                barDetails[1].open <= barDetails[2].open && //Baby Red is in middle of bars
+                ask > ((barDetails[0].close * _Point) + (mul2 * _Point)) && //Take position after price has reached Final Green candles close
+                ((strictRule1 == 0) || (strictRule1 == 1 && (barDetails[3].close - barDetails[3].open) > (barDetails[3].open - barDetails[3].low))) && //First Green wick cant be bigger than its Candle
+                ((strictRule2 == 0) || (strictRule2 == 1 && (barDetails[3].open < barDetails[2].low))) && //Baby wick cant be lower than First Green wick
+                ((strictRule3 == 0) || (strictRule3 == 1 && (barBeforeFirstLargeGreenBarDistance < firstLargeGreenBarDistance))) && //Previous cant be Engulfing
+                ((strictRule4 == 0) || (strictRule4 == 1 && 
+                 ((barDetails[3].high - barDetails[3].close) < (barDetails[3].close + (firstLargeGreenBarDistance/div1))) && //Wicks cant be bigger than a fifth of the Candle 
+                 ((barDetails[3].open - barDetails[3].low) < (barDetails[3].open + (firstLargeGreenBarDistance/div1))) && 
+                 ((barDetails[1].high - barDetails[1].close) < (barDetails[1].close + (thirdLargeGreenBarDistance/div1))) && 
+                 ((barDetails[1].open - barDetails[1].low) < (barDetails[1].open + (thirdLargeGreenBarDistance/div1)))));
 
   if (result == true)
   {
     Alert("Three bar play at Current bar -1");
   }
-
+  
   return result;
 }
 
