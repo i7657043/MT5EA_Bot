@@ -191,7 +191,7 @@ void OnTick()
       "\nCurrent bar -2 HIGH:" + barDetails[2].high +
       "\nCurrent bar -3 HIGH:" + barDetails[3].high +
       "\n\nCurrent bar -1 LOW:" + barDetails[1].low +
-      "\nCurrent bar -2 LOW:" + barDetails[2].low +
+      "\nCurrent bar -2 LOW:" + barDetails[2].close +
       "\nCurrent bar -3 LOW:" + barDetails[3].low +
       "\n\nCurrent Buy Price:" + ask +
       "\nCurrent Sell Price:" + bid +
@@ -209,7 +209,7 @@ void OnTick()
     //  return; // Don't open a new Buy Position
     //}
 
-    tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, ask);
+    tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, barDetails[2].open);
 
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
     {
@@ -270,7 +270,11 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
    barBeforeFirstLargeGreenBarDistance = barDetails[4].open - barDetails[4].close;
   }
 
-  if (firstLargeGreenBarDistance == 0 || thirdLargeGreenBarDistance == 0)
+  if (firstLargeGreenBarDistance == 0 || 
+      thirdLargeGreenBarDistance == 0 ||
+      firstLargeGreenBarDistance < 0 ||
+      thirdLargeGreenBarDistance < 0 ||
+      secondBabyRedBarDistance > 0)
   {
     return false;
   }
@@ -281,75 +285,37 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
     Alert("Debugging Time");
   }
 
-  // if (firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2.5))
-  // {
-  //   Alert("First Green Bar is 2.5 times the size of the small Red Bar");
-  // }
-  // if (barDetails[3].close > barDetails[3].open)
-  // {
-  //   Alert("First Bar Green");
-  // }
-  // if (barDetails[2].close <= barDetails[2].open)
-  // {
-  //   Alert("Second Bar Red");
-  // }
-  // if (barDetails[1].close > barDetails[1].open)
-  // {
-  //   Alert("Third Bar Green");
-  // }
-  // if (barDetails[3].open < barDetails[2].close)
-  // {
-  //   Alert("");
-  // }
-  // if (barDetails[1].close > barDetails[2].open)
-  // {
-  //   Alert("");
-  // }
-  // if (
-  //     barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / 5)) ||
-  //     barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / 3)))
-  // {
-  //   Alert("");
-  // }
-  // if (barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / 5)))
-  // {
-  //   Alert("");
-  // }
-  // if (barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / 3)))
-  // {
-  //   Alert("");
-  // }
-  // if (thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2))
-  // {
-  //   Alert("");
-  // }
-  // if (barDetails[1].open <= barDetails[2].open)
-  // {
-  //   Alert("");
-  // }
-  // if (ask > ((barDetails[0].close * _Point) + (2 * _Point)))
-  // {
-  //   Alert("");
-  // }
-
   bool result = firstLargeGreenBarDistance > (secondBabyRedBarDistance * mul1) &&
                 barDetails[3].close > barDetails[3].open &&
                 barDetails[2].close <= barDetails[2].open &&
-                barDetails[1].close > barDetails[1].open &&
+                barDetails[1].close > barDetails[1].open && //Bars are correct type (check done above?)
+                
                 barDetails[3].open < barDetails[2].close &&
-                barDetails[1].close > barDetails[2].open &&
-                (barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / div1)) ||
-                 barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / div2))) &&
-                barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / div1)) &&
-                barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / div2)) &&
-                thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2) &&
-                barDetails[1].open <= barDetails[2].open && //Baby Red is in middle of bars
-                ask > ((barDetails[0].close * _Point) + (mul2 * _Point)) && //Take position after price has reached Final Green candles close
-                ((strictRule1 == 0) || (strictRule1 == 1 && (barDetails[3].close - barDetails[3].open) > (barDetails[3].open - barDetails[3].low))) && //First Green wick cant be bigger than its Candle
-                ((strictRule2 == 0) || (strictRule2 == 1 && (barDetails[3].open < barDetails[2].low))) && //Baby wick cant be lower than First Green wick
-                ((strictRule3 == 0) || (strictRule3 == 1 && (barBeforeFirstLargeGreenBarDistance < firstLargeGreenBarDistance))) && //Previous cant be Engulfing
+                barDetails[1].close > barDetails[2].open && //Outer greens surround baby red
+                
+                (barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / div1)) || //bottom of baby red bar must be below the bottom of the top fifth of the first green bar 
+                 barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / div2))) && //or the bottom of baby red bar must be below the top of the top fifth of the first green bar (is this part good? nope it might negate first rule)
+                                 
+                barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / div2)) && //top of baby red is below bottom of top fifth of third green bar (if this is true no need for rule on line 296?)
+                barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / div1)) && //top of baby red bar is below top of bottom fifth of third green bar 
+                //These 2 rules mean the top of baby red has to be in between top and bottom fifths of final green                
+                                                 
+                barDetails[1].open <= barDetails[2].open && //bottom of third green bar is below top of baby red bar 
+                barDetails[1].close >= barDetails[2].open && //top of first green bar is above bottom of baby red bar
+                //with these 2 rules the baby red bar is never engulfed by one outer green only (not good rule as img would flop?)               
+                     
+                thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2) && //third green bar needs to be at least twice the size of the baby red bar
+                firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2) && //first green bar needs to be at least twice the size of the baby red bar
+                
+                ask >= ((barDetails[0].close * _Point) + (mul2 * _Point)) && //Take position after price has reached Final Green candles close + X points
+                
+                ((strictRule1 == 0) || (strictRule1 == 1 && (barDetails[3].close - barDetails[3].open) > (barDetails[3].open - barDetails[3].low))) && //first green bars top wick cant be bigger than its Candle
+                
+                ((strictRule2 == 0) || (strictRule2 == 1 && (barDetails[3].open < barDetails[2].low))) && //bottom of first green bar is below the bottom baby red wick
+                
+                ((strictRule3 == 0) || (strictRule3 == 1 && (barBeforeFirstLargeGreenBarDistance < firstLargeGreenBarDistance))) && //previous candlle cant be an engulfing candle
                 ((strictRule4 == 0) || (strictRule4 == 1 && 
-                 ((barDetails[3].high - barDetails[3].close) < (barDetails[3].close + (firstLargeGreenBarDistance/div1))) && //Wicks cant be bigger than a fifth of the Candle 
+                 ((barDetails[3].high - barDetails[3].close) < (barDetails[3].close + (firstLargeGreenBarDistance/div1))) && //wicks cant be bigger than a fifth of the candle (why do these add the close on?)
                  ((barDetails[3].open - barDetails[3].low) < (barDetails[3].open + (firstLargeGreenBarDistance/div1))) && 
                  ((barDetails[1].high - barDetails[1].close) < (barDetails[1].close + (thirdLargeGreenBarDistance/div1))) && 
                  ((barDetails[1].open - barDetails[1].low) < (barDetails[1].open + (thirdLargeGreenBarDistance/div1)))));
@@ -362,11 +328,11 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   return result;
 }
 
-MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, double ask)
+MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, double stopLossPrice)
 {
   tradeRequest.action = TRADE_ACTION_DEAL; // immediate order execution
 
-  tradeRequest.sl = NormalizeDouble(bid - STP * _Point, _Digits);
+  tradeRequest.sl = NormalizeDouble(stopLossPrice, _Digits);
   tradeRequest.tp = NormalizeDouble(bid + TKP * _Point, _Digits);
 
   tradeRequest.symbol = _Symbol;                 // currency pair
