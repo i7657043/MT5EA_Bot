@@ -4,40 +4,36 @@
 //|                                                             None |
 //+------------------------------------------------------------------+
 //--- input parameters
-input int stopLoss = 64;
-input int takeProfit = 113;
-input int movingAveragePeriod = 50;
-input int expertAdvisorMagicNumber = 12345; // EA Magic Number
-input double lotSize = 0.1;                 // Lots to Trade
-input double barIntervalThreshold = 6;      // Bar Trade interval
+input bool stopLossPrice=false;             //Set StopLoss at bottom of baby red bar
+input int stopLoss = 64;                    //Stop Loss
+input int takeProfit = 113;                 //Take Profit
+input int barIntervalThreshold = 6;         // Bar Trade interval
 
-input double mul1=2.5; //Multiplier Value 1
-input double mul2=2; //Multiplier Value 2
-
-input double div1=4; //Division Value 1
-input double div2=3; //Division Value 2
-
-input int strictRule1=1; //Strict Rule 1
-input int strictRule2=1; //Strict Rule 2
-input int strictRule3=1; //Strict Rule 3
-input int strictRule4=1; //Strict Rule 4
+//---Optimisation input parameters
+input double babyBarOverallSizeArg=2;   //Outer bars must be X times the size of the baby bar
+input double outerBoundaryThreshold=5;  //Lower number = tighter outer boundaries
+input double takePositionThreshold=2;   //Enter after price = final bar close + X points
+input bool babyRedEnglufed=false;       //Baby red bar cant be totally engulfed by either Green bar
+input bool outerGreensEngulfed=false;   //Baby red bar wick shoudln't engulf either outer green bar body
 
 //--- Other parameters
+int movingAveragePeriod = 50;
+int expertAdvisorMagicNumber = 12345;
+double lotSize = 0.01;               
+
 int movingAverageHandler; // handle for our Moving Average indicator
 double movingAverages[];  // Dynamic array to hold the values of Moving Average for each bars
-int STP, TKP;             // To be used for Stop Loss & Take Profit values
+
+string currentTime = "";
+bool isNewBar = false;
 
 bool positionTakenThisBar = false;
-bool isNewBar = false;
-string currentTime = "";
-
 bool tradeBarCounterActive = 0;
 int barsSinceLastTrade = 0;
-int barTradeIntervalThreshold = 0;
 
 int OnInit()
 {
-  //--- Get the handle for Moving Average indicator
+ //--- Get the handle for Moving Average indicator
   movingAverageHandler = iMA(_Symbol, _Period, movingAveragePeriod, 0, MODE_EMA, PRICE_CLOSE);
 
   //--- What if handle returns Invalid Handle
@@ -45,18 +41,7 @@ int OnInit()
   {
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
   }
-
-  STP = stopLoss;
-  TKP = takeProfit;
-  barTradeIntervalThreshold = barIntervalThreshold;
   
-
-  //if (_Digits == 5 || _Digits == 3)
-  //{
-  //  STP = STP * 10;
-  //  TKP = TKP * 10;
-  //}
-
   return (INIT_SUCCEEDED);
 }
 
@@ -67,17 +52,6 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
-  //--- Do we have enough bars to work with
-  // int Mybars = Bars(_Symbol, _Period);
-  // if (Mybars < 60) // if total bars is less than 60 bars
-  // {
-  //   Alert("We have less than 60 bars, EA will now exit!!");
-  //   return;
-  // }
-
-  // We will use the static oldTime variable to serve the bar time.
-  // At each OnTick execution we will check the current bar time with the saved one.
-  // If the bar time isn't equal to the saved time, it indicates that we have a new tick.
   static datetime oldTime;
   datetime newTime[1];
 
@@ -100,10 +74,10 @@ void OnTick()
     ResetLastError();
     return;
   }
-
+  
   if (isNewBar == true)
   { 
-    if (barsSinceLastTrade > barTradeIntervalThreshold)
+    if (barsSinceLastTrade > barIntervalThreshold)
     {
       tradeBarCounterActive = false;
       barsSinceLastTrade = 0;
@@ -116,24 +90,13 @@ void OnTick()
 
     positionTakenThisBar = false;
   }
-
-  //--- EA should only check for new trade if we have a new bar
-  //if (isNewBar == false)
-  //{
-  //  return;
-  //}
-
-  //--- Define some MQL5 Structures we will use for our trade
+  
   MqlTick latestPriceDetails;   // To be used for getting recent/latest price quotes
   MqlTradeRequest tradeRequest; // To be used for sending our trade requests
   MqlTradeResult tradeResult;   // To be used to get our trade results
   MqlRates barDetails[];        // To be used to store the prices, volumes and spread of each bar
-  ZeroMemory(tradeRequest);     // Initialization of tradeRequest structure
-
-  /*
-      Let's make sure our arrays values for the Rates and MA values 
-      is store serially similar to the timeseries array
-      */
+  ZeroMemory(tradeRequest);     // Initialization of tradeRequest struct
+  
   // the bar details arrays
   ArraySetAsSeries(barDetails, true);
   // the MA-8 values arrays
@@ -158,58 +121,15 @@ void OnTick()
     return;
   }
 
-  //--- We have no errors, so continue to trading
-
-  //--- Do we have positions opened already? //ToDo: improve this to check more strictly
-  bool buy_opened = false;
-  bool sell_opened = false;
-
-  if (PositionSelect(_Symbol) == true) // we have an opened position
-  {
-    if (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
-    {
-      buy_opened = true;
-    }
-    else if (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL)
-    {
-      sell_opened = true;
-    }
-  }
+  //--- We have no errors, so continue to trading  
 
   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
   int spread = (int)MathRound((ask - bid) / SymbolInfoDouble(Symbol(), SYMBOL_POINT));
 
-  Comment(
-      "Current bar -1 OPEN:" + barDetails[1].open +
-      "\nCurrent bar -2 OPEN:" + barDetails[2].open +
-      "\nCurrent bar -3 OPEN:" + barDetails[3].open +
-      "\n\nCurrent bar -1 CLOSE:" + barDetails[1].close +
-      "\nCurrent bar -2 CLOSE:" + barDetails[2].close +
-      "\nCurrent bar -3 CLOSE:" + barDetails[3].close +
-      "\n\nCurrent bar -1 HIGH:" + barDetails[1].high +
-      "\nCurrent bar -2 HIGH:" + barDetails[2].high +
-      "\nCurrent bar -3 HIGH:" + barDetails[3].high +
-      "\n\nCurrent bar -1 LOW:" + barDetails[1].low +
-      "\nCurrent bar -2 LOW:" + barDetails[2].close +
-      "\nCurrent bar -3 LOW:" + barDetails[3].low +
-      "\n\nCurrent Buy Price:" + ask +
-      "\nCurrent Sell Price:" + bid +
-      "\n\nCurrent Spread:" + spread);
-
-  // previous price closed above MA-8
-  //bool buyCondition1 = (latestPriceDetails.bid > movingAverages[1]);
-
   if (tradeBarCounterActive == false && positionTakenThisBar == false && CheckForLong3BarPlay(barDetails, ask))
   {
-    // any already opened Buy position?
-    //if (buy_opened)
-    //{
-    //  Alert("We already have a Buy Position!!!");
-    //  return; // Don't open a new Buy Position
-    //}
-
-    tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, barDetails[2].open);
+    tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[2].close);
 
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
     {
@@ -224,37 +144,7 @@ void OnTick()
       return;
     }
   }
-
-  // previous price closed below MA-8
-  //bool sellCondition1 = (latestPriceDetails.ask < movingAverages[1]);
-
-  // bool buyCondition1 = CheckForShort3BarPlay(barDetails);
-
-  // if (sellCondition1 && positionTakenThisBar == false)
-  // {
-  //   // any already opened Sell position?
-  //   //if (sell_opened)
-  //   //{
-  //   //  Alert("We already have a Sell Position!!!");
-  //   //  return; // Don't open a new Sell Position
-  //   //}
-
-  //   tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, ask);
-
-  //   if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
-  //   {
-  //     Alert("A Sell order at ask price:", ask, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
-  //   }
-  //   else
-  //   {
-  //     Alert("The Sell order request could not be completed -error:", GetLastError());
-  //     ResetLastError();
-  //     return;
-  //   }
-
-  //   positionTakenThisBar = true;
-  // }
-
+  
   isNewBar = false;
 }
 
@@ -264,76 +154,88 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   double secondBabyRedBarDistance = barDetails[2].open - barDetails[2].close;
   double thirdLargeGreenBarDistance = barDetails[1].close - barDetails[1].open;
   double barBeforeFirstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
-  
   if (barBeforeFirstLargeGreenBarDistance < 0)
   {
    barBeforeFirstLargeGreenBarDistance = barDetails[4].open - barDetails[4].close;
   }
-
-  if (firstLargeGreenBarDistance == 0 || 
-      thirdLargeGreenBarDistance == 0 ||
-      firstLargeGreenBarDistance < 0 ||
-      thirdLargeGreenBarDistance < 0 ||
-      secondBabyRedBarDistance > 0)
-  {
-    return false;
-  }
+  
   //For easier debugging of which statement is incorrect
-
   if (currentTime == "2019.10.03 05:34")
   {
     Alert("Debugging Time");
-  }
-
-  bool result = firstLargeGreenBarDistance > (secondBabyRedBarDistance * mul1) &&
-                barDetails[3].close > barDetails[3].open &&
-                barDetails[2].close <= barDetails[2].open &&
-                barDetails[1].close > barDetails[1].open && //Bars are correct type (check done above?)
-                
-                barDetails[3].open < barDetails[2].close &&
-                barDetails[1].close > barDetails[2].open && //Outer greens surround baby red
-                
-                (barDetails[2].close <= (barDetails[3].close - (firstLargeGreenBarDistance / div1)) || //bottom of baby red bar must be below the bottom of the top fifth of the first green bar 
-                 barDetails[2].close <= (barDetails[3].close + (firstLargeGreenBarDistance / div2))) && //or the bottom of baby red bar must be below the top of the top fifth of the first green bar (is this part good? nope it might negate first rule)
-                                 
-                barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / div2)) && //top of baby red is below bottom of top fifth of third green bar (if this is true no need for rule on line 296?)
-                barDetails[2].open <= (barDetails[1].open + (thirdLargeGreenBarDistance / div1)) && //top of baby red bar is below top of bottom fifth of third green bar 
-                //These 2 rules mean the top of baby red has to be in between top and bottom fifths of final green                
-                                                 
-                barDetails[1].open <= barDetails[2].open && //bottom of third green bar is below top of baby red bar 
-                barDetails[1].close >= barDetails[2].open && //top of first green bar is above bottom of baby red bar
-                //with these 2 rules the baby red bar is never engulfed by one outer green only (not good rule as img would flop?)               
-                     
-                thirdLargeGreenBarDistance > (secondBabyRedBarDistance * 2) && //third green bar needs to be at least twice the size of the baby red bar
-                firstLargeGreenBarDistance > (secondBabyRedBarDistance * 2) && //first green bar needs to be at least twice the size of the baby red bar
-                
-                ask >= ((barDetails[0].close * _Point) + (mul2 * _Point)) && //Take position after price has reached Final Green candles close + X points
-                
-                ((strictRule1 == 0) || (strictRule1 == 1 && (barDetails[3].close - barDetails[3].open) > (barDetails[3].open - barDetails[3].low))) && //first green bars top wick cant be bigger than its Candle
-                
-                ((strictRule2 == 0) || (strictRule2 == 1 && (barDetails[3].open < barDetails[2].low))) && //bottom of first green bar is below the bottom baby red wick
-                
-                ((strictRule3 == 0) || (strictRule3 == 1 && (barBeforeFirstLargeGreenBarDistance < firstLargeGreenBarDistance))) && //previous candlle cant be an engulfing candle
-                ((strictRule4 == 0) || (strictRule4 == 1 && 
-                 ((barDetails[3].high - barDetails[3].close) < (barDetails[3].close + (firstLargeGreenBarDistance/div1))) && //wicks cant be bigger than a fifth of the candle (why do these add the close on?)
-                 ((barDetails[3].open - barDetails[3].low) < (barDetails[3].open + (firstLargeGreenBarDistance/div1))) && 
-                 ((barDetails[1].high - barDetails[1].close) < (barDetails[1].close + (thirdLargeGreenBarDistance/div1))) && 
-                 ((barDetails[1].open - barDetails[1].low) < (barDetails[1].open + (thirdLargeGreenBarDistance/div1)))));
-
-  if (result == true)
+  }  
+  
+  //Check bars are correct type, baby red can be Doji bar
+  if (firstLargeGreenBarDistance <= 0 || thirdLargeGreenBarDistance <= 0 || secondBabyRedBarDistance < 0)  
   {
-    Alert("Three bar play at Current bar -1");
+    return false;
   }
   
-  return result;
+  //Outer bars must be X times the size of the baby bar
+  if (!(firstLargeGreenBarDistance > (secondBabyRedBarDistance * babyBarOverallSizeArg)) ||
+      !(thirdLargeGreenBarDistance > (secondBabyRedBarDistance * babyBarOverallSizeArg)))
+  {
+    return false;
+  }
+  
+  //Top of baby red bar must be below top Xth of third green bar
+  //And
+  //Bottom of baby red bar must be above bottom Xth of first green bar
+  //This Rule makes sure outer green bars totally surround BODY of baby red, but not Wick
+  if (!(barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / outerBoundaryThreshold))) ||
+      !(barDetails[2].close >= (barDetails[3].open + (firstLargeGreenBarDistance / outerBoundaryThreshold))))
+  {
+   return false;
+  }
+  
+  //Baby red bar wick shoudln't engulf either outer green bar body
+  //If this is on there is no need for below Rule as this is Tighter
+  if (outerGreensEngulfed && ((barDetails[2].high > barDetails[3].close) && (barDetails[2].low < barDetails[3].open)) ||
+      ((barDetails[2].high > barDetails[1].close) && (barDetails[2].low < barDetails[3].open)))
+  {
+   return false;
+  }  
+  //Baby red bar wick shoudln't engulf either outer green bar range 
+  //if (((barDetails[2].high > barDetails[3].high) && (barDetails[2].low < barDetails[3].low)) ||
+  //    ((barDetails[2].high > barDetails[1].high) && (barDetails[2].low < barDetails[3].low)))
+  //{
+  //  return false;
+  //}
+  
+  //Top of first green bar must be below top of baby red bar
+  //AND
+  //Bottom of third green bar must be above bottom of baby red bar
+  //This Rule stops the baby red bar being Engulfed by either outer green bar
+  //i.e. the baby red bar must run over into both green bars
+  if (babyRedEnglufed && !(barDetails[3].close < barDetails[2].open) || 
+      !(barDetails[1].open > barDetails[2].close))
+  {
+   return false;
+  }  
+  
+  //Take position after price has reached Final Green candles close + X points
+  if (!(ask >= ((barDetails[0].close * _Point) + (takePositionThreshold * _Point))))
+  {
+   return false;
+  }    
+  
+  return true;
 }
 
-MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, double stopLossPrice)
+MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, bool stopLossPrice, double babyBarClosePrice)
 {
   tradeRequest.action = TRADE_ACTION_DEAL; // immediate order execution
 
-  tradeRequest.sl = NormalizeDouble(stopLossPrice, _Digits);
-  tradeRequest.tp = NormalizeDouble(bid + TKP * _Point, _Digits);
+  if (stopLossPrice)
+  {
+   tradeRequest.sl = NormalizeDouble(babyBarClosePrice, _Digits);
+  }
+  else
+  {
+   tradeRequest.sl = NormalizeDouble(bid - stopLoss * _Point, _Digits);
+  }
+  
+  tradeRequest.tp = NormalizeDouble(bid + takeProfit * _Point, _Digits);
 
   tradeRequest.symbol = _Symbol;                 // currency pair
   tradeRequest.volume = lotSize;                 // number of lots to trade
@@ -346,12 +248,20 @@ MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &trad
   return tradeResult;
 }
 
-MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, double ask)
+MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, double ask, bool stopLossPrice)
 {
   tradeRequest.action = TRADE_ACTION_DEAL;
 
-  tradeRequest.sl = NormalizeDouble(ask + STP * _Point, _Digits);
-  tradeRequest.tp = NormalizeDouble(ask - TKP * _Point, _Digits);
+  if (stopLossPrice)
+  {
+   tradeRequest.sl = NormalizeDouble(stopLossPrice, _Digits);
+  }
+  else
+  {
+   tradeRequest.sl = NormalizeDouble(ask + stopLoss * _Point, _Digits);
+  }
+  
+  tradeRequest.tp = NormalizeDouble(ask - takeProfit * _Point, _Digits);
 
   tradeRequest.symbol = _Symbol;                 // currency pair
   tradeRequest.volume = lotSize;                 // number of lots to trade
