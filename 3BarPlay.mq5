@@ -14,7 +14,9 @@ input double babyBarOverallSizeArg=2;   //Outer bars must be X times the size of
 input double outerBoundaryThreshold=5;  //Lower number = tighter outer boundaries
 input double takePositionThreshold=2;   //Enter after price = final bar close + X points
 input bool babyRedEnglufed=false;       //Baby red bar cant be totally engulfed by either Green bar
-input bool outerGreensEngulfed=false;   //Baby red bar wick shoudln't engulf either outer green bar body
+input bool outerBarsEngulfed=false;   //Baby red bar wick shoudln't engulf either outer green bar body
+
+input bool makeShortTrades=false;   //Make short trades as well as longs
 
 //--- Other parameters
 int movingAveragePeriod = 50;
@@ -145,6 +147,24 @@ void OnTick()
     }
   }
   
+  if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckForShort3BarPlay(barDetails, bid))
+  {
+    tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[2].close);
+
+    if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
+    {
+      positionTakenThisBar = true;
+      tradeBarCounterActive = true;
+      Alert("A Sell order at ask price: ", ask, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
+    }
+    else
+    {
+      Alert("The Sell order request could not be completed -error:", GetLastError());
+      ResetLastError();
+      return;
+    }
+  }
+  
   isNewBar = false;
 }
 
@@ -190,7 +210,7 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   
   //Baby red bar wick shoudln't engulf either outer green bar body
   //If this is on there is no need for below Rule as this is Tighter
-  if (outerGreensEngulfed && ((barDetails[2].high > barDetails[3].close) && (barDetails[2].low < barDetails[3].open)) ||
+  if (outerBarsEngulfed && ((barDetails[2].high > barDetails[3].close) && (barDetails[2].low < barDetails[3].open)) ||
       ((barDetails[2].high > barDetails[1].close) && (barDetails[2].low < barDetails[3].open)))
   {
    return false;
@@ -215,6 +235,80 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   
   //Take position after price has reached Final Green candles close + X points
   if (!(ask >= ((barDetails[0].close * _Point) + (takePositionThreshold * _Point))))
+  {
+   return false;
+  }    
+  
+  return true;
+}
+
+bool CheckForShort3BarPlay(MqlRates &barDetails[], double bid)
+{
+  double firstLargeRedBarDistance = barDetails[3].open - barDetails[3].close;
+  double secondBabyGreenBarDistance = barDetails[2].close - barDetails[2].open;
+  double thirdLargeRedBarDistance = barDetails[1].open - barDetails[1].close;
+  double barBeforeFirstRedGreenBarDistance = barDetails[4].open - barDetails[4].close;
+  if (barBeforeFirstRedGreenBarDistance < 0)
+  {
+   barBeforeFirstRedGreenBarDistance = barDetails[4].open - barDetails[4].close;
+  }
+  
+  //For easier debugging of which statement is incorrect
+  if (currentTime == "2019.10.03 05:34")
+  {
+    Alert("Debugging Time");
+  }  
+  
+  //Check bars are correct type, baby red can be Doji bar
+  if (firstLargeRedBarDistance >= 0 || thirdLargeRedBarDistance >= 0 || secondBabyGreenBarDistance > 0)  
+  {
+    return false;
+  }
+  
+  //Outer bars must be X times the size of the baby bar
+  if (!(firstLargeRedBarDistance > (secondBabyGreenBarDistance * babyBarOverallSizeArg)) ||
+      !(thirdLargeRedBarDistance > (secondBabyGreenBarDistance * babyBarOverallSizeArg)))
+  {
+    return false;
+  }
+  
+  //Top of baby green bar must be below top Xth of third red bar
+  //And
+  //Bottom of baby green bar must be above bottom Xth of first red bar
+  //This Rule makes sure outer red bars totally surround BODY of baby green, but not Wick
+  if (!(barDetails[2].close <= (barDetails[1].open - (thirdLargeRedBarDistance / outerBoundaryThreshold))) ||
+      !(barDetails[2].open >= (barDetails[3].close + (firstLargeRedBarDistance / outerBoundaryThreshold))))
+  {
+   return false;
+  }
+  
+  //Baby green bar wick shoudln't engulf either outer red bar body
+  //If this is on there is no need for below Rule as this is Tighter
+  if (outerBarsEngulfed && ((barDetails[2].high > barDetails[3].open) && (barDetails[2].low < barDetails[3].close)) ||
+      ((barDetails[2].high > barDetails[1].open) && (barDetails[2].low < barDetails[3].close)))
+  {
+   return false;
+  }  
+  //Baby red bar wick shoudln't engulf either outer green bar range 
+  //if (((barDetails[2].high > barDetails[3].high) && (barDetails[2].low < barDetails[3].low)) ||
+  //    ((barDetails[2].high > barDetails[1].high) && (barDetails[2].low < barDetails[3].low)))
+  //{
+  //  return false;
+  //}
+  
+  //Top of first red bar must be below top of baby green bar
+  //AND
+  //Bottom of third red bar must be above bottom of baby green bar
+  //This Rule stops the baby green bar being Engulfed by either outer red bars
+  //i.e. the baby green bar must run over into both red bars
+  if (babyRedEnglufed && !(barDetails[3].open < barDetails[2].close) || 
+      !(barDetails[1].close > barDetails[2].open))
+  {
+   return false;
+  }  
+  
+  //Take position after price has reached Final red candles close + X points
+  if (!(bid <= ((barDetails[0].close * _Point) + (takePositionThreshold * _Point))))
   {
    return false;
   }    
@@ -248,7 +342,7 @@ MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &trad
   return tradeResult;
 }
 
-MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, double ask, bool stopLossPrice)
+MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double ask, bool stopLossPrice, double babyBarClosePrice)
 {
   tradeRequest.action = TRADE_ACTION_DEAL;
 
