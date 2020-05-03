@@ -215,9 +215,9 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   {
    return false;
   }  
+  
   //Baby red bar wick shoudln't engulf either outer green bar range 
-  //if (((barDetails[3].high > barDetails[3].high) && (barDetails[2].low < barDetails[3].low)) ||
-  //    ((barDetails[3].high > barDetails[1].high) && (barDetails[2].low < barDetails[3].low)))
+  //if ((barDetails[3].high > barDetails[4].high) || (barDetails[3].low < barDetails[4].low) || (barDetails[3].high > barDetails[2].high) || (barDetails[3].low < barDetails[4].low))
   //{
   //  return false;
   //}
