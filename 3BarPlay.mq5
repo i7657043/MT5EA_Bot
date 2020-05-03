@@ -147,23 +147,23 @@ void OnTick()
     }
   }
   
-  if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckForShort3BarPlay(barDetails, bid))
-  {
-    tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[2].close);
+  //if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckForShort3BarPlay(barDetails, bid))
+  //{
+  //  tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[2].close);
 
-    if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
-    {
-      positionTakenThisBar = true;
-      tradeBarCounterActive = true;
-      Alert("A Sell order at ask price: ", ask, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
-    }
-    else
-    {
-      Alert("The Sell order request could not be completed -error:", GetLastError());
-      ResetLastError();
-      return;
-    }
-  }
+  //  if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
+  //  {
+  //    positionTakenThisBar = true;
+  //    tradeBarCounterActive = true;
+  //    Alert("A Sell order at ask price: ", ask, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
+  //  }
+  //  else
+  //  {
+  //    Alert("The Sell order request could not be completed -error:", GetLastError());
+  //    ResetLastError();
+   //   return;
+   // }
+  //}
   
   isNewBar = false;
 }
@@ -232,6 +232,13 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   {
    return false;
   }  
+    
+  //baby red wick top must be below first green wick top and below third grenen wick top
+  //if (!(barDetails[2].high < barDetails[1].high) || 
+  //    !(barDetails[2].high < barDetails[3].high))
+  //{
+  // return false;
+  //}  
   
   //Take position after price has reached Final Green candles close + X points
   if (!(ask >= ((barDetails[0].close * _Point) + (takePositionThreshold * _Point))))
