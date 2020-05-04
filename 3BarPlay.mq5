@@ -221,6 +221,12 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   //{
   //  return false;
   //}
+  //Either baby red bar wick shoudln't engulf either outer green bar range 
+  //if (((barDetails[2].high > barDetails[3].high) || (barDetails[2].low < barDetails[3].low)) ||
+  //    ((barDetails[2].high > barDetails[1].high) || (barDetails[2].low < barDetails[3].low)))
+  //{
+  //  return false;
+  //}
   
   //Top of first green bar must be below top of baby red bar
   //AND
@@ -232,13 +238,6 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   {
    return false;
   }  
-    
-  //baby red wick top must be below first green wick top and below third grenen wick top
-  //if (!(barDetails[2].high < barDetails[1].high) || 
-  //    !(barDetails[2].high < barDetails[3].high))
-  //{
-  // return false;
-  //}  
   
   //Take position after price has reached Final Green candles close + X points
   if (!(ask >= ((barDetails[0].close * _Point) + (takePositionThreshold * _Point))))
