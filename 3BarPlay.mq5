@@ -13,11 +13,12 @@ input int barIntervalThreshold = 6;         // Bar Trade interval
 input double babyBarOverallSizeArg=2;   //Outer bars must be X times the size of the baby bar
 input double outerBoundaryThreshold=5;  //Lower number = tighter outer boundaries
 input double takePositionThreshold=2;   //Enter after price = final bar close + X points
-input int minPoints=0; //Outer bars must be spread > X number of points
+input int minPoints=0;                  //Outer bars must be spread > X number of points
+input double barWickSize=0;             //Wicks must be X times smaller than their bodies
 input bool babyRedEnglufed=false;       //Baby red bar cant be totally engulfed by either Green bar
-input bool outerBarsEngulfed=false;   //Baby red bar wick shoudln't engulf either outer green bar body
+input bool outerBarsEngulfed=false;     //Baby red bar wick shoudln't engulf either outer green bar body
 
-input bool makeShortTrades=false;   //Make short trades as well as longs
+input bool makeShortTrades=false;       //Make short trades as well as longs
 
 
 //--- Other parameters
@@ -204,8 +205,9 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
    return false;
   }  
   
-  //baby red bar cant be above outer green bars
-  if ((bardetails[2].high >  bardetails[1].high) || (bardetails[2].high >  bardetails[3].high))  
+  //baby red bar cant be above or below outer green bars
+  if ((barDetails[2].high >  barDetails[1].high) || (barDetails[2].high >  barDetails[3].high) ||
+      (barDetails[2].low <  barDetails[1].low) || (barDetails[2].low <  barDetails[3].low))  
   {
     return false;
   }
@@ -228,6 +230,18 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   {
     return false;
   }
+  
+  //Wicks must be X times smaller than their bodies
+  //if (barWickSize > 0)
+  //{
+  // if (!((barDetails[3].high - barDetails[3].close) < (firstLargeGreenBarDistance / barWickSize)) ||
+  //    !((barDetails[3].open - barDetails[3].low) < (firstLargeGreenBarDistance / barWickSize))   ||
+  //     !((barDetails[1].high - barDetails[1].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
+  //     !((barDetails[1].open - barDetails[1].low) < (thirdLargeGreenBarDistance / barWickSize)))
+  // {
+  //  return false;
+  // }
+  //} 
   
   //Top of baby red bar must be below top Xth of third green bar
   //And
