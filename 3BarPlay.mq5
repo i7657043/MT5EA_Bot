@@ -13,10 +13,12 @@ input int barIntervalThreshold = 6;         // Bar Trade interval
 input double babyBarOverallSizeArg=2;   //Outer bars must be X times the size of the baby bar
 input double outerBoundaryThreshold=5;  //Lower number = tighter outer boundaries
 input double takePositionThreshold=2;   //Enter after price = final bar close + X points
+input int minPoints=0; //Outer bars must be spread > X number of points
 input bool babyRedEnglufed=false;       //Baby red bar cant be totally engulfed by either Green bar
 input bool outerBarsEngulfed=false;   //Baby red bar wick shoudln't engulf either outer green bar body
 
 input bool makeShortTrades=false;   //Make short trades as well as longs
+
 
 //--- Other parameters
 int movingAveragePeriod = 50;
@@ -25,6 +27,8 @@ double lotSize = 0.01;
 
 int movingAverageHandler; // handle for our Moving Average indicator
 double movingAverages[];  // Dynamic array to hold the values of Moving Average for each bars
+
+double volume[];
 
 string currentTime = "";
 bool isNewBar = false;
@@ -99,10 +103,12 @@ void OnTick()
   MqlRates barDetails[];        // To be used to store the prices, volumes and spread of each bar
   ZeroMemory(tradeRequest);     // Initialization of tradeRequest struct
   
-  // the bar details arrays
+  // the bar details array
   ArraySetAsSeries(barDetails, true);
-  // the MA-8 values arrays
+  // the MA-8 values array
   ArraySetAsSeries(movingAverages, true);
+  // the volume array
+  ArraySetAsSeries(volume, true);
 
   //--- Get the last price quote using the MQL5 MqlTick Structure
   if (!SymbolInfoTick(_Symbol, latestPriceDetails))
@@ -122,8 +128,15 @@ void OnTick()
     Alert("Error copying Moving Average indicator buffer - error:", GetLastError());
     return;
   }
+  
+  //--- Get the details of the latest 5 volumes
+  CopyBuffer(iVolumes(_Symbol, _Period, VOLUME_TICK), 0, 0, 5, volume);
 
   //--- We have no errors, so continue to trading  
+
+   Comment("Volume of Current bar: " + volume[0]      + 
+          "\nVolume of Current bar -1: " + volume[1] + 
+          "\nVolume of Current bar -2: " + volume[2]);  
 
   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
@@ -180,10 +193,28 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   }
   
   //For easier debugging of which statement is incorrect
-  if (currentTime == "2019.10.03 05:34")
+  if (currentTime == "2018.09.25 02:15")
   {
     Alert("Debugging Time");
   }  
+  
+  //Outer green bars must be X number of points
+  if ((firstLargeGreenBarDistance < (minPoints * _Point)) || (thirdLargeGreenBarDistance < (minPoints * _Point)))
+  {
+   return false;
+  }  
+  
+  //baby red bar cant be above outer green bars
+  if ((bardetails[2].high >  bardetails[1].high) || (bardetails[2].high >  bardetails[3].high))  
+  {
+    return false;
+  }
+  
+  //third green bar close must be above first green close and third green bar open must be above first green open
+  if (!(barDetails[1].close >  barDetails[3].close) && !(barDetails[1].open >  barDetails[3].open))  
+  {
+    return false;
+  }
   
   //Check bars are correct type, baby red can be Doji bar
   if (firstLargeGreenBarDistance <= 0 || thirdLargeGreenBarDistance <= 0 || secondBabyRedBarDistance < 0)  
@@ -239,8 +270,11 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
    return false;
   }  
   
-  //Take position after price has reached Final Green candles close + X points
-  if (!(ask >= ((barDetails[0].close * _Point) + (takePositionThreshold * _Point))))
+  //Check volume
+  
+  
+  //Take position after current bar has reached Final Green candles close + X points
+  if (!(barDetails[0].high >= (barDetails[1].high + (takePositionThreshold * _Point))))
   {
    return false;
   }    
@@ -260,7 +294,7 @@ bool CheckForShort3BarPlay(MqlRates &barDetails[], double bid)
   }
   
   //For easier debugging of which statement is incorrect
-  if (currentTime == "2019.10.03 05:34")
+  if (currentTime == "2018.09.25 02:14")
   {
     Alert("Debugging Time");
   }  
@@ -314,7 +348,7 @@ bool CheckForShort3BarPlay(MqlRates &barDetails[], double bid)
   }  
   
   //Take position after price has reached Final red candles close + X points
-  if (!(bid <= ((barDetails[0].close * _Point) + (takePositionThreshold * _Point))))
+  if (!(bid < ((barDetails[0].high * _Point) + (takePositionThreshold * _Point))))
   {
    return false;
   }    
