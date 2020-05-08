@@ -26,6 +26,9 @@ double lotSize = 0.01;
 int movingAverageHandler; // handle for our Moving Average indicator
 double movingAverages[];  // Dynamic array to hold the values of Moving Average for each bars
 
+double volume[];
+double rsi[];
+
 string currentTime = "";
 bool isNewBar = false;
 
@@ -103,7 +106,11 @@ void OnTick()
   ArraySetAsSeries(barDetails, true);
   // the MA-8 values arrays
   ArraySetAsSeries(movingAverages, true);
-
+  // the volume array
+  ArraySetAsSeries(volume, true);
+  // the volume array
+  ArraySetAsSeries(rsi, true);
+  
   //--- Get the last price quote using the MQL5 MqlTick Structure
   if (!SymbolInfoTick(_Symbol, latestPriceDetails))
   {
@@ -122,8 +129,18 @@ void OnTick()
     Alert("Error copying Moving Average indicator buffer - error:", GetLastError());
     return;
   }
+  
+  //--- Get the details of the latest 5 volumes
+  CopyBuffer(iVolumes(_Symbol, _Period, VOLUME_TICK), 0, 0, 5, volume);
+  
+  //--- Get the details of the latest 5 volumes
+  CopyBuffer(iRSI(_Symbol, _Period, 14, PRICE_CLOSE), 0, 0, 5, rsi);
 
   //--- We have no errors, so continue to trading  
+
+   Comment("Volume of Current bar: " + volume[0]      + 
+          "\nVolume of Current bar -1: " + volume[1]  + 
+          "\nVolume of Current bar -2: " + volume[2]);  
 
   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
