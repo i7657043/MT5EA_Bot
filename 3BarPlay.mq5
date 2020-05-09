@@ -148,7 +148,7 @@ void OnTick()
 
   if (tradeBarCounterActive == false && positionTakenThisBar == false && CheckForLong3BarPlay(barDetails, ask))
   {
-    tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);
+    tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);
 
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
     {
