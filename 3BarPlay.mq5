@@ -154,11 +154,11 @@ void OnTick()
   {
     if (weirdRevertLong == true)
     {
-      tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);    
+      tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);    
     }
     else
     {
-      tradeResult = MakeLongTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);
+      tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);
     }
   
   
@@ -171,7 +171,15 @@ void OnTick()
     }
     else
     {
-      Alert("The Buy order request could not be completed -error:", GetLastError());
+      if (weirdRevertLong == true)
+      {
+        Alert("The Buy (SELL) order request (price: " + bid + ") could not be completed -error:", GetLastError());   
+      }
+      else
+      {  
+        Alert("The Buy order request (price: " + ask + ") could not be completed -error:", GetLastError());
+      }
+      
       ResetLastError();
       return;
     }
@@ -181,11 +189,11 @@ void OnTick()
   {
     if (weirdRevertShort == true)
     {
-      tradeResult = MakeLongTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);    
+      tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);    
     }
     else
     {
-      tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);
+      tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);
     }
 
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
@@ -196,7 +204,15 @@ void OnTick()
     }
     else
     {
-      Alert("The Buy order request could not be completed -error:", GetLastError());
+      if (weirdRevertShort == true)
+      {
+        Alert("The Sell (BUY) order request (price: " + ask + ") could not be completed -error:", GetLastError());   
+      }
+      else
+      {  
+        Alert("The Sell order request (price: " + bid + ") could not be completed -error:", GetLastError());
+      }
+      
       ResetLastError();
       return;
     }
