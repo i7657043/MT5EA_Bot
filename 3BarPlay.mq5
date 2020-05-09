@@ -7,6 +7,7 @@
 input bool stopLossPrice=false;             //Mod Stop loss price On/Off 
 input int stopLoss = 64;                    //Stop Loss
 input int takeProfit = 113;                 //Take Profit
+input double lotSize = 0.01;                //Lot Size
 input int barIntervalThreshold = 6;         // Bar Trade interval
 
 //---Optimisation input parameters
@@ -16,12 +17,15 @@ input double openDistance=1;           //Each bar must Open X points above previ
 input double minPoints=2;              //Each bar must be > X number of points
 input double barWickSize=1;            //Higher Number = Smaller Wicks
 
-input bool makeShortTrades=false;   //Make short trades as well as longs
+input bool makeShortTrades=false;   //Make Short trades
+input bool makeLongTrades=false;   //Make Long trades
+input bool weirdRevertLong=false;   //Short when Signals say Long
+input bool weirdRevertShort=false;  //Long when Signals say Short
 
 //--- Other parameters
 int movingAveragePeriod = 50;
 int expertAdvisorMagicNumber = 12345;
-double lotSize = 0.01;               
+             
 
 int movingAverageHandler; // handle for our Moving Average indicator
 double movingAverages[];  // Dynamic array to hold the values of Moving Average for each bars
@@ -146,15 +150,49 @@ void OnTick()
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
   int spread = (int)MathRound((ask - bid) / SymbolInfoDouble(Symbol(), SYMBOL_POINT));
 
-  if (tradeBarCounterActive == false && positionTakenThisBar == false && CheckForLong3BarPlay(barDetails, ask))
+  if (makeLongTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3WhiteSoldiers(barDetails, ask))
   {
-    tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);
-
+    if (weirdRevertLong == true)
+    {
+      tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);    
+    }
+    else
+    {
+      tradeResult = MakeLongTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);
+    }
+  
+  
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
     {
       positionTakenThisBar = true;
       tradeBarCounterActive = true;
       Alert("A Buy order at bid price: ", bid, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
+      return;
+    }
+    else
+    {
+      Alert("The Buy order request could not be completed -error:", GetLastError());
+      ResetLastError();
+      return;
+    }
+  }
+  
+  if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3BlackCrows(barDetails, bid))
+  {
+    if (weirdRevertShort == true)
+    {
+      tradeResult = MakeLongTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);    
+    }
+    else
+    {
+      tradeResult = MakeShortTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);
+    }
+
+    if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
+    {
+      positionTakenThisBar = true;
+      tradeBarCounterActive = true;
+      Alert("A Sell order at bid price: ", bid, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
     }
     else
     {
@@ -167,7 +205,7 @@ void OnTick()
   isNewBar = false;
 }
 
-bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
+bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
 {
   double firstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
   double secondLargeGreenBarDistance = barDetails[3].close - barDetails[3].open;
@@ -226,6 +264,72 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   
   //Take position after price has reached Final Green candles close + X points
   if (takePositionThreshold > 0 && !(ask <= (barDetails[2].high + (takePositionThreshold * _Point))))
+  {
+   return false;
+  }    
+  
+  return true;
+}
+
+bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
+{
+  double firstLargeRedBarDistance = barDetails[4].open - barDetails[4].close;
+  double secondLargeRedBarDistance = barDetails[3].open - barDetails[3].close;
+  double thirdLargeRedBarDistance = barDetails[2].open - barDetails[2].close;
+  double barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
+  if (barBeforeFirstLargeGreenBarDistance < 0)
+  {
+   barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
+  }
+  
+  //For easier debugging of which statement is incorrect
+  if (currentTime == "2019.10.03 05:34")
+  {
+    Alert("Debugging Time");
+  }  
+  
+  //Check bars are correct type
+  if (firstLargeRedBarDistance <= 0 || secondLargeRedBarDistance <= 0 || thirdLargeRedBarDistance <= 0)  
+  {
+    return false;
+  }  
+  
+  //third red bar close must be X below second red close, second red close must be X below first red close
+  //AND third red bar open must be X below second red open, second red open must be X below first red open
+  if (!(barDetails[2].close <  (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close <  (barDetails[4].close + (closeDistance * _Point))) ||
+      !(barDetails[2].open <  (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close <  (barDetails[4].close + (openDistance * _Point))))  
+  {
+    return false;
+  }  
+  
+  //Bars must be X number of points
+  if ((firstLargeRedBarDistance < (minPoints * _Point)) || (secondLargeRedBarDistance < (minPoints * _Point)) || (thirdLargeRedBarDistance < (minPoints * _Point)))
+  {
+   return false;
+  } 
+  
+  //Wicks must be < than Xth of Bar 
+  if (barWickSize > 0)
+  {
+   if (!((barDetails[4].high - barDetails[4].open) < (firstLargeRedBarDistance / barWickSize))  ||
+       !((barDetails[4].close - barDetails[4].low) < (firstLargeRedBarDistance / barWickSize))    ||
+       !((barDetails[3].high - barDetails[3].open) < (secondLargeRedBarDistance / barWickSize)) ||
+       !((barDetails[3].close - barDetails[3].low) < (secondLargeRedBarDistance / barWickSize))   ||
+       !((barDetails[2].high - barDetails[2].open) < (thirdLargeRedBarDistance / barWickSize))  ||
+       !((barDetails[2].close - barDetails[2].low) < (thirdLargeRedBarDistance / barWickSize)))
+   {
+    return false;
+   }
+  } 
+  
+  //Conf bar must be Red bar
+  if ((barDetails[1].open - barDetails[1].close) <= 0)
+  {
+   return false;
+  }
+  
+  //Take position after price has reached Final Red candles close - X points
+  if (takePositionThreshold > 0 && !(bid >= (barDetails[2].low - (takePositionThreshold * _Point))))
   {
    return false;
   }    
