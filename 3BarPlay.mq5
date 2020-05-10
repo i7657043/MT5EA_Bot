@@ -49,7 +49,9 @@ int OnInit()
   {
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
   }
-
+  
+  Alert("STOP LOSS MIN: " + SymbolInfoInteger(_Symbol,SYMBOL_TRADE_STOPS_LEVEL));
+  
   return (INIT_SUCCEEDED);
 }
 
