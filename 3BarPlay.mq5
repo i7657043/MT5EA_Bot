@@ -10,12 +10,11 @@ input double lotSize = 0.01;        //Lot Size
 input int barIntervalThreshold = 6; // Bar Trade interval
 
 //---Optimisation input parameters
-input double takePositionThreshold = 2; //Enter after price = final bar close + X points
-input double closeDistance = 1;         //Each bar must Close X points above previous
-input double openDistance = 1;          //Each bar must Open X points above previous
-input double minPoints = 2;             //Each bar must be > X number of points
-input double barWickSize = 1;           //Higher Number = Smaller Wicks
-input bool waitForConfBar = true;       //Wait for Conf bar
+input double takePositionThreshold = 0.01; //Enter after price = final bar close + X points
+input double closeDistance = 2;         //Each bar must Close X points above previous
+input double openDistance = 2;          //Each bar must Open X points above previous
+input double minPoints = 3;             //Each bar must be > X number of points
+input double barWickSize = 3;           //Higher Number = Smaller Wicks
 
 input bool makeShortTrades = false;     //Make Short trades
 input bool makeLongTrades = false;      //Make Long trades
@@ -122,22 +121,22 @@ void OnTick()
   }
 
   //--- Get the details of the latest 5 bars and MA
-  if (CopyRates(_Symbol, _Period, 0, 6, barDetails) < 0)
+  if (CopyRates(_Symbol, _Period, 0, 5, barDetails) < 0)
   {
     Alert("Error copying rates/history data - error:", GetLastError(), "!!");
     return;
   }
-  if (CopyBuffer(movingAverageHandler, 0, 0, 6, movingAverages) < 0)
+  if (CopyBuffer(movingAverageHandler, 0, 0, 5, movingAverages) < 0)
   {
     Alert("Error copying Moving Average indicator buffer - error:", GetLastError());
     return;
   }
 
   //--- Get the details of the latest 5 volumes
-  CopyBuffer(iVolumes(_Symbol, _Period, VOLUME_TICK), 0, 0, 6, volume);
+  CopyBuffer(iVolumes(_Symbol, _Period, VOLUME_TICK), 0, 0, 5, volume);
 
   //--- Get the details of the latest 5 volumes
-  CopyBuffer(iRSI(_Symbol, _Period, 14, PRICE_CLOSE), 0, 0, 6, rsi);
+  CopyBuffer(iRSI(_Symbol, _Period, 14, PRICE_CLOSE), 0, 0, 5, rsi);
 
   //--- We have no errors, so continue to trading
 
@@ -221,13 +220,13 @@ void OnTick()
 
 bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
 {
-  double firstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
-  double secondLargeGreenBarDistance = barDetails[3].close - barDetails[3].open;
-  double thirdLargeGreenBarDistance = barDetails[2].close - barDetails[2].open;
-  double barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
+  double firstLargeGreenBarDistance = barDetails[3].close - barDetails[3].open;
+  double secondLargeGreenBarDistance = barDetails[2].close - barDetails[2].open;
+  double thirdLargeGreenBarDistance = barDetails[1].close - barDetails[1].open;
+  double barBeforeFirstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
   if (barBeforeFirstLargeGreenBarDistance < 0)
   {
-    barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
+    barBeforeFirstLargeGreenBarDistance = barDetails[4].open - barDetails[4].close;
   }
 
   //For easier debugging of which statement is incorrect
@@ -244,8 +243,8 @@ bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
 
   //third green bar close must be X above second green close, second green close must be X above first green close
   //AND third green bar open must be X above second green open, second green open must be X above first green open
-  if (!(barDetails[2].close > (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close > (barDetails[4].close + (closeDistance * _Point))) ||
-      !(barDetails[2].open > (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close > (barDetails[4].close + (openDistance * _Point))))
+  if (!(barDetails[1].close > (barDetails[2].close + (closeDistance * _Point))) || !(barDetails[2].close > (barDetails[3].close + (closeDistance * _Point))) ||
+      !(barDetails[1].open > (barDetails[2].open + (openDistance * _Point))) || !(barDetails[2].close > (barDetails[3].close + (openDistance * _Point))))
   {
     return false;
   }
@@ -259,25 +258,25 @@ bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
   //Wicks must be < than Xth of Bar
   if (barWickSize > 0)
   {
-    if (!((barDetails[4].high - barDetails[4].close) < (firstLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[4].open - barDetails[4].low) < (firstLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[3].high - barDetails[3].close) < (secondLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[3].open - barDetails[3].low) < (secondLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[2].high - barDetails[2].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[2].open - barDetails[2].low) < (thirdLargeGreenBarDistance / barWickSize)))
+    if (!((barDetails[3].high - barDetails[3].close) < (firstLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[3].open - barDetails[3].low) < (firstLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[2].high - barDetails[2].close) < (secondLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[2].open - barDetails[2].low) < (secondLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[1].high - barDetails[1].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[1].open - barDetails[1].low) < (thirdLargeGreenBarDistance / barWickSize)))
     {
       return false;
     }
   }
 
   //Conf bar must be Green bar
-  if (waitForConfBar == true && (barDetails[1].close - barDetails[1].open) < 0)
-  {
-    return false;
-  }
+  //if (waitForConfBar == true && (barDetails[1].close - barDetails[1].open) < 0)
+  //{
+  //  return false;
+  //}
 
   //Take position after price has reached Final Green candles close + X points
-  if (takePositionThreshold > 0 && !(ask <= (barDetails[2].high + (takePositionThreshold * _Point))))
+  if (takePositionThreshold > 0 && !(ask <= (barDetails[1].high + (takePositionThreshold * _Point))))
   {
     return false;
   }
@@ -287,13 +286,13 @@ bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
 
 bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
 {
-  double firstLargeRedBarDistance = barDetails[4].open - barDetails[4].close;
-  double secondLargeRedBarDistance = barDetails[3].open - barDetails[3].close;
-  double thirdLargeRedBarDistance = barDetails[2].open - barDetails[2].close;
-  double barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
+  double firstLargeRedBarDistance = barDetails[3].open - barDetails[3].close;
+  double secondLargeRedBarDistance = barDetails[2].open - barDetails[2].close;
+  double thirdLargeRedBarDistance = barDetails[1].open - barDetails[1].close;
+  double barBeforeFirstLargeGreenBarDistance = barDetails[4].open - barDetails[4].close;
   if (barBeforeFirstLargeGreenBarDistance < 0)
   {
-    barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
+    barBeforeFirstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
   }
 
   //For easier debugging of which statement is incorrect
@@ -310,8 +309,8 @@ bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
 
   //third red bar close must be X below second red close, second red close must be X below first red close
   //AND third red bar open must be X below second red open, second red open must be X below first red open
-  if (!(barDetails[2].close < (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close < (barDetails[4].close + (closeDistance * _Point))) ||
-      !(barDetails[2].open < (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close < (barDetails[4].close + (openDistance * _Point))))
+  if (!(barDetails[1].close < (barDetails[2].close + (closeDistance * _Point))) || !(barDetails[2].close < (barDetails[3].close + (closeDistance * _Point))) ||
+      !(barDetails[1].open < (barDetails[2].open + (openDistance * _Point))) || !(barDetails[2].close < (barDetails[3].close + (openDistance * _Point))))
   {
     return false;
   }
@@ -325,25 +324,25 @@ bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
   //Wicks must be < than Xth of Bar
   if (barWickSize > 0)
   {
-    if (!((barDetails[4].high - barDetails[4].open) < (firstLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[4].close - barDetails[4].low) < (firstLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[3].high - barDetails[3].open) < (secondLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[3].close - barDetails[3].low) < (secondLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[2].high - barDetails[2].open) < (thirdLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[2].close - barDetails[2].low) < (thirdLargeRedBarDistance / barWickSize)))
+    if (!((barDetails[3].high - barDetails[3].open) < (firstLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[3].close - barDetails[3].low) < (firstLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[2].high - barDetails[2].open) < (secondLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[2].close - barDetails[2].low) < (secondLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[1].high - barDetails[1].open) < (thirdLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[1].close - barDetails[1].low) < (thirdLargeRedBarDistance / barWickSize)))
     {
       return false;
     }
   }
 
   //Conf bar must be Red bar
-  if (waitForConfBar == true && (barDetails[1].open - barDetails[1].close) <= 0)
-  {
-    return false;
-  }
+  //if (waitForConfBar == true && (barDetails[1].open - barDetails[1].close) <= 0)
+  //{
+  //  return false;
+  //}
 
   //Take position after price has reached Final Red candles close - X points
-  if (takePositionThreshold > 0 && !(bid >= (barDetails[2].low - (takePositionThreshold * _Point))))
+  if (takePositionThreshold > 0 && !(bid >= (barDetails[1].low - (takePositionThreshold * _Point))))
   {
     return false;
   }
