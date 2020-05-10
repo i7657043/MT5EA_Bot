@@ -10,13 +10,14 @@ input double lotSize = 0.01;        //Lot Size
 input int barIntervalThreshold = 6; // Bar Trade interval
 
 //---Optimisation input parameters
-input double takePositionThreshold = 2; //Enter after price = final bar close + X points
-input double closeDistance = 1;         //Each bar must Close X points above previous
-input double openDistance = 1;          //Each bar must Open X points above previous
-input double minPoints = 2;             //Each bar must be > X number of points
-input double barWickSize = 1;           //Higher Number = Smaller Wicks
-input bool waitForConfBar = true;       //Wait for Conf bar
+input double babyBarOverallSizeArg=2;   //Outer bars must be X times the size of the baby bar
+input double outerBoundaryThreshold=5;  //Lower number = tighter outer boundaries
+input int minPoints=0;                  //Outer bars must be spread > X number of points
+input double barWickSize=0;             //Wicks must be X times smaller than their bodies
 
+
+input double takePositionThreshold=2;   //Enter after price = final bar close + X points
+input bool waitForConfBar = true;       //Wait for Conf bar
 input bool makeShortTrades = false;     //Make Short trades
 input bool makeLongTrades = false;      //Make Long trades
 input bool weirdRevertLong = false;     //Short when Signals say Long
@@ -151,7 +152,7 @@ void OnTick()
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
   int spread = (int)MathRound((ask - bid) / SymbolInfoDouble(Symbol(), SYMBOL_POINT));
 
-  if (makeLongTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3WhiteSoldiers(barDetails, ask))
+  if (makeLongTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckForLong3BarPlay(barDetails, ask))
   {
     if (weirdRevertLong == true)
     {
@@ -183,173 +184,126 @@ void OnTick()
       ResetLastError();
       return;
     }
-  }
+  
 
-  if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3BlackCrows(barDetails, bid))
-  {
-    if (weirdRevertShort == true)
-    {
-      tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid);
-    }
-    else
-    {
-      tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask);
-    }
+  //if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false)
+  //{
+  //  if (weirdRevertShort == true)
+  //  {
+  //    tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid);
+  //  }
+  //  else
+  //  {
+  //    tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask);
+  //  }
 
-    if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
-    {
-      positionTakenThisBar = true;
-      tradeBarCounterActive = true;
-      Alert("A Sell order at bid price: ", bid, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
-    }
-    else
-    {
-      if (weirdRevertShort == true)
-      {
-        Alert("The Sell (BUY) order request (price: " + ask + ") could not be completed -error:", GetLastError());
-      }
-      else
-      {
-        Alert("The Sell order request (price: " + bid + ") could not be completed -error:", GetLastError());
-      }
+  //  if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
+  //  {
+  //    positionTakenThisBar = true;
+  //    tradeBarCounterActive = true;
+  //    Alert("A Sell order at bid price: ", bid, " has been successfully placed with Ticket#:", tradeResult.order, "!!");
+  //  }
+  //  else
+  //  {
+  //    if (weirdRevertShort == true)
+  //    {
+  //      Alert("The Sell (BUY) order request (price: " + ask + ") could not be completed -error:", GetLastError());
+  //    }
+  //    else
+  //    {
+  //      Alert("The Sell order request (price: " + bid + ") could not be completed -error:", GetLastError());
+  //    }
 
-      ResetLastError();
-      return;
-    }
+  //    ResetLastError();
+  //    return;
+  //}
   }
 
   isNewBar = false;
 }
 
-bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
+bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
 {
   double firstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
-  double secondLargeGreenBarDistance = barDetails[3].close - barDetails[3].open;
+  double secondBabyRedBarDistance = barDetails[3].open - barDetails[3].close;
   double thirdLargeGreenBarDistance = barDetails[2].close - barDetails[2].open;
   double barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
   if (barBeforeFirstLargeGreenBarDistance < 0)
   {
-    barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
+   barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
   }
-
+  
   //For easier debugging of which statement is incorrect
-  if (currentTime == "2020.04.15 15:30")
+  if (currentTime == "2018.09.25 02:15")
   {
     Alert("Debugging Time");
-  }
-
-  //Check bars are correct type
-  if (firstLargeGreenBarDistance <= 0 || secondLargeGreenBarDistance <= 0 || thirdLargeGreenBarDistance <= 0)
+  }  
+  
+  //Check bars are correct type, baby red can be Doji bar
+  if (firstLargeGreenBarDistance <= 0 || thirdLargeGreenBarDistance <= 0 || secondBabyRedBarDistance < 0)  
   {
     return false;
   }
-
-  //third green bar close must be X above second green close, second green close must be X above first green close
-  //AND third green bar open must be X above second green open, second green open must be X above first green open
-  if (!(barDetails[2].close > (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close > (barDetails[4].close + (closeDistance * _Point))) ||
-      !(barDetails[2].open > (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close > (barDetails[4].close + (openDistance * _Point))))
+  
+  //Outer green bars must be X number of points
+  if ((firstLargeGreenBarDistance < (minPoints * _Point)) || (thirdLargeGreenBarDistance < (minPoints * _Point)))
+  {
+   return false;
+  }  
+  
+  //baby red bar cant be above or below outer green bars
+  if ((barDetails[3].high >  barDetails[2].high) || (barDetails[3].high >  barDetails[4].high) ||
+      (barDetails[3].low <  barDetails[2].low) || (barDetails[3].low <  barDetails[4].low))  
   {
     return false;
   }
-
-  //Bars must be X number of points
-  if ((firstLargeGreenBarDistance < (minPoints * _Point)) || (secondLargeGreenBarDistance < (minPoints * _Point)) || (thirdLargeGreenBarDistance < (minPoints * _Point)))
+  
+  //third green bar close must be above first green close and third green bar open must be above first green open
+  if (!(barDetails[2].close >  barDetails[4].close) && !(barDetails[2].open >  barDetails[4].open))  
+  {
+    return false;
+  } 
+  
+  
+  //Outer bars must be X times the size of the baby bar
+  if (!(firstLargeGreenBarDistance > (secondBabyRedBarDistance * babyBarOverallSizeArg)) ||
+      !(thirdLargeGreenBarDistance > (secondBabyRedBarDistance * babyBarOverallSizeArg)))
   {
     return false;
   }
-
-  //Wicks must be < than Xth of Bar
-  if (barWickSize > 0)
+  
+  //Wicks must be X times smaller than their bodies  
+  if (barWickSize > 0 && (!((barDetails[4].high - barDetails[4].close) < (firstLargeGreenBarDistance / barWickSize)) ||
+                          !((barDetails[4].open - barDetails[4].low) < (firstLargeGreenBarDistance / barWickSize))   ||
+                          !((barDetails[2].high - barDetails[2].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
+                          !((barDetails[2].open - barDetails[2].low) < (thirdLargeGreenBarDistance / barWickSize))))
   {
-    if (!((barDetails[4].high - barDetails[4].close) < (firstLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[4].open - barDetails[4].low) < (firstLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[3].high - barDetails[3].close) < (secondLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[3].open - barDetails[3].low) < (secondLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[2].high - barDetails[2].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
-        !((barDetails[2].open - barDetails[2].low) < (thirdLargeGreenBarDistance / barWickSize)))
-    {
-      return false;
-    }
+    return false;
   }
-
-  //Conf bar must be Green bar
+  
+  
+  //Top of baby red bar must be below top Xth of third green bar
+  //And
+  //Bottom of baby red bar must be above bottom Xth of first green bar
+  //This Rule makes sure outer green bars totally surround BODY of baby red, but not Wick
+  if (!(barDetails[3].open <= (barDetails[2].close - (thirdLargeGreenBarDistance / outerBoundaryThreshold))) ||
+      !(barDetails[3].close >= (barDetails[4].open + (firstLargeGreenBarDistance / outerBoundaryThreshold))))
+  {
+   return false;
+  }
+  
+  //Conf bar must be Green bar //Can only have this if getting 6 bars
   if (waitForConfBar == true && (barDetails[1].close - barDetails[1].open) < 0)
   {
     return false;
   }
-
+    
   //Take position after price has reached Final Green candles close + X points
   if (takePositionThreshold > 0 && !(ask <= (barDetails[2].high + (takePositionThreshold * _Point))))
   {
     return false;
   }
-
-  return true;
-}
-
-bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
-{
-  double firstLargeRedBarDistance = barDetails[4].open - barDetails[4].close;
-  double secondLargeRedBarDistance = barDetails[3].open - barDetails[3].close;
-  double thirdLargeRedBarDistance = barDetails[2].open - barDetails[2].close;
-  double barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
-  if (barBeforeFirstLargeGreenBarDistance < 0)
-  {
-    barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
-  }
-
-  //For easier debugging of which statement is incorrect
-  if (currentTime == "2020.04.15 15:30")
-  {
-    Alert("Debugging Time");
-  }
-
-  //Check bars are correct type
-  if (firstLargeRedBarDistance <= 0 || secondLargeRedBarDistance <= 0 || thirdLargeRedBarDistance <= 0)
-  {
-    return false;
-  }
-
-  //third red bar close must be X below second red close, second red close must be X below first red close
-  //AND third red bar open must be X below second red open, second red open must be X below first red open
-  if (!(barDetails[2].close < (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close < (barDetails[4].close + (closeDistance * _Point))) ||
-      !(barDetails[2].open < (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close < (barDetails[4].close + (openDistance * _Point))))
-  {
-    return false;
-  }
-
-  //Bars must be X number of points
-  if ((firstLargeRedBarDistance < (minPoints * _Point)) || (secondLargeRedBarDistance < (minPoints * _Point)) || (thirdLargeRedBarDistance < (minPoints * _Point)))
-  {
-    return false;
-  }
-
-  //Wicks must be < than Xth of Bar
-  if (barWickSize > 0)
-  {
-    if (!((barDetails[4].high - barDetails[4].open) < (firstLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[4].close - barDetails[4].low) < (firstLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[3].high - barDetails[3].open) < (secondLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[3].close - barDetails[3].low) < (secondLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[2].high - barDetails[2].open) < (thirdLargeRedBarDistance / barWickSize)) ||
-        !((barDetails[2].close - barDetails[2].low) < (thirdLargeRedBarDistance / barWickSize)))
-    {
-      return false;
-    }
-  }
-
-  //Conf bar must be Red bar
-  if (waitForConfBar == true && (barDetails[1].open - barDetails[1].close) <= 0)
-  {
-    return false;
-  }
-
-  //Take position after price has reached Final Red candles close - X points
-  if (takePositionThreshold > 0 && !(bid >= (barDetails[2].low - (takePositionThreshold * _Point))))
-  {
-    return false;
-  }
-
+  
   return true;
 }
 
