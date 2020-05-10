@@ -224,13 +224,13 @@ void OnTick()
 
 bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
 {
-  double firstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
-  double secondBabyRedBarDistance = barDetails[3].open - barDetails[3].close;
-  double thirdLargeGreenBarDistance = barDetails[2].close - barDetails[2].open;
-  double barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
+  double firstLargeGreenBarDistance = barDetails[3].close - barDetails[3].open;
+  double secondBabyRedBarDistance = barDetails[2].open - barDetails[2].close;
+  double thirdLargeGreenBarDistance = barDetails[1].close - barDetails[1].open;
+  double barBeforeFirstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
   if (barBeforeFirstLargeGreenBarDistance < 0)
   {
-   barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
+   barBeforeFirstLargeGreenBarDistance = barDetails[4].open - barDetails[4].close;
   }
   
   //For easier debugging of which statement is incorrect
@@ -252,14 +252,14 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   }  
   
   //baby red bar cant be above or below outer green bars
-  if ((barDetails[3].high >  barDetails[2].high) || (barDetails[3].high >  barDetails[4].high) ||
-      (barDetails[3].low <  barDetails[2].low) || (barDetails[3].low <  barDetails[4].low))  
+  if ((barDetails[2].high >  barDetails[1].high) || (barDetails[2].high >  barDetails[3].high) ||
+      (barDetails[2].low <  barDetails[1].low) || (barDetails[2].low <  barDetails[3].low))  
   {
     return false;
   }
   
   //third green bar close must be above first green close and third green bar open must be above first green open
-  if (!(barDetails[2].close >  barDetails[4].close) && !(barDetails[2].open >  barDetails[4].open))  
+  if (!(barDetails[1].close >  barDetails[3].close) && !(barDetails[1].open >  barDetails[3].open))  
   {
     return false;
   } 
@@ -273,33 +273,33 @@ bool CheckForLong3BarPlay(MqlRates &barDetails[], double ask)
   }
   
   //Wicks must be X times smaller than their bodies  
-  if (barWickSize > 0 && (!((barDetails[4].high - barDetails[4].close) < (firstLargeGreenBarDistance / barWickSize)) ||
-                          !((barDetails[4].open - barDetails[4].low) < (firstLargeGreenBarDistance / barWickSize))   ||
-                          !((barDetails[2].high - barDetails[2].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
-                          !((barDetails[2].open - barDetails[2].low) < (thirdLargeGreenBarDistance / barWickSize))))
-  {
-    return false;
-  }
+  //if (barWickSize > 0 && (!((barDetails[3].high - barDetails[3].close) < (firstLargeGreenBarDistance / barWickSize)) ||
+  //                        !((barDetails[3].open - barDetails[3].low) < (firstLargeGreenBarDistance / barWickSize))   ||
+  //                        !((barDetails[1].high - barDetails[1].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
+  //                        !((barDetails[1].open - barDetails[1].low) < (thirdLargeGreenBarDistance / barWickSize))))
+  //{
+  //  return false;
+  //}
   
   
   //Top of baby red bar must be below top Xth of third green bar
   //And
   //Bottom of baby red bar must be above bottom Xth of first green bar
   //This Rule makes sure outer green bars totally surround BODY of baby red, but not Wick
-  if (!(barDetails[3].open <= (barDetails[2].close - (thirdLargeGreenBarDistance / outerBoundaryThreshold))) ||
-      !(barDetails[3].close >= (barDetails[4].open + (firstLargeGreenBarDistance / outerBoundaryThreshold))))
+  if (!(barDetails[2].open <= (barDetails[1].close - (thirdLargeGreenBarDistance / outerBoundaryThreshold))) ||
+      !(barDetails[2].close >= (barDetails[3].open + (firstLargeGreenBarDistance / outerBoundaryThreshold))))
   {
    return false;
   }
   
   //Conf bar must be Green bar //Can only have this if getting 6 bars
-  if (waitForConfBar == true && (barDetails[1].close - barDetails[1].open) < 0)
-  {
-    return false;
-  }
+  //if (waitForConfBar == true && (barDetails[1].close - barDetails[1].open) < 0)
+  //{
+  //  return false;
+  //}
     
   //Take position after price has reached Final Green candles close + X points
-  if (takePositionThreshold > 0 && !(ask <= (barDetails[2].high + (takePositionThreshold * _Point))))
+  if (takePositionThreshold > 0 && !(ask <= (barDetails[1].high + (takePositionThreshold * _Point))))
   {
     return false;
   }
