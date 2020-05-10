@@ -15,11 +15,12 @@ input double closeDistance = 1;         //Each bar must Close X points above pre
 input double openDistance = 1;          //Each bar must Open X points above previous
 input double minPoints = 2;             //Each bar must be > X number of points
 input double barWickSize = 1;           //Higher Number = Smaller Wicks
+input bool waitForConfBar = true;       //Wait for Conf bar
 
-input bool makeShortTrades = false;  //Make Short trades
-input bool makeLongTrades = false;   //Make Long trades
-input bool weirdRevertLong = false;  //Short when Signals say Long
-input bool weirdRevertShort = false; //Long when Signals say Short
+input bool makeShortTrades = false;     //Make Short trades
+input bool makeLongTrades = false;      //Make Long trades
+input bool weirdRevertLong = false;     //Short when Signals say Long
+input bool weirdRevertShort = false;    //Long when Signals say Short
 
 //--- Other parameters
 int movingAveragePeriod = 50;
@@ -270,7 +271,7 @@ bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
   }
 
   //Conf bar must be Green bar
-  if ((barDetails[1].close - barDetails[1].open) <= 0)
+  if (waitForConfBar == true && (barDetails[1].close - barDetails[1].open) < 0)
   {
     return false;
   }
@@ -336,7 +337,7 @@ bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
   }
 
   //Conf bar must be Red bar
-  if ((barDetails[1].open - barDetails[1].close) <= 0)
+  if (waitForConfBar == true && (barDetails[1].open - barDetails[1].close) <= 0)
   {
     return false;
   }
@@ -362,6 +363,12 @@ void GetTrades()
   
   int totalDeals = HistoryDealsTotal();
   long ticket = 0;
+  double   price;
+  double   profit;
+  datetime time;
+  string   symbol;
+  long     type;
+  long     entry;
   
   for (int i = 0; i < totalDeals; i++)
   {
@@ -374,13 +381,19 @@ void GetTrades()
       entry =HistoryDealGetInteger(ticket,DEAL_ENTRY);
       profit=HistoryDealGetDouble(ticket,DEAL_PROFIT);
       
-      if (EnumToString(HistoryDealGetInteger(ticket, DEAL_REASON)) == "DEAL_REASON_SL")
+      ENUM_ORDER_REASON reason = HistoryDealGetInteger(ticket, DEAL_REASON);
+      
+      if (EnumToString(reason) == "DEAL_REASON_SL")
       {
         Print("STOP LOSS HIT: ticket ", ticket, "  triggered SL");
       }
-      else if (EnumToString(HistoryDealGetInteger(ticket, DEAL_REASON)) == "DEAL_REASON_TP")
+      else if (EnumToString(reason) == "DEAL_REASON_TP")
       {  
         Print("TAKE PROFIT HIT: ticket ", ticket, "  triggered TP");
+      }
+      else
+      {  
+        Print("OTHER ticket ", ticket, "  triggered OTHER");
       }
     }
   }
