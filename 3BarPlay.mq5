@@ -4,28 +4,26 @@
 //|                                                             None |
 //+------------------------------------------------------------------+
 //--- input parameters
-input bool stopLossPrice=false;             //Mod Stop loss price On/Off 
-input int stopLoss = 64;                    //Stop Loss
-input int takeProfit = 113;                 //Take Profit
-input double lotSize = 0.01;                //Lot Size
-input int barIntervalThreshold = 6;         // Bar Trade interval
+input int stopLoss = 64;            //Stop Loss
+input int takeProfit = 113;         //Take Profit
+input double lotSize = 0.01;        //Lot Size
+input int barIntervalThreshold = 6; // Bar Trade interval
 
 //---Optimisation input parameters
-input double takePositionThreshold=2;  //Enter after price = final bar close + X points
-input double closeDistance=1;          //Each bar must Close X points above previous
-input double openDistance=1;           //Each bar must Open X points above previous
-input double minPoints=2;              //Each bar must be > X number of points
-input double barWickSize=1;            //Higher Number = Smaller Wicks
+input double takePositionThreshold = 2; //Enter after price = final bar close + X points
+input double closeDistance = 1;         //Each bar must Close X points above previous
+input double openDistance = 1;          //Each bar must Open X points above previous
+input double minPoints = 2;             //Each bar must be > X number of points
+input double barWickSize = 1;           //Higher Number = Smaller Wicks
 
-input bool makeShortTrades=false;   //Make Short trades
-input bool makeLongTrades=false;   //Make Long trades
-input bool weirdRevertLong=false;   //Short when Signals say Long
-input bool weirdRevertShort=false;  //Long when Signals say Short
+input bool makeShortTrades = false;  //Make Short trades
+input bool makeLongTrades = false;   //Make Long trades
+input bool weirdRevertLong = false;  //Short when Signals say Long
+input bool weirdRevertShort = false; //Long when Signals say Short
 
 //--- Other parameters
 int movingAveragePeriod = 50;
 int expertAdvisorMagicNumber = 12345;
-             
 
 int movingAverageHandler; // handle for our Moving Average indicator
 double movingAverages[];  // Dynamic array to hold the values of Moving Average for each bars
@@ -42,7 +40,7 @@ int barsSinceLastTrade = 0;
 
 int OnInit()
 {
- //--- Get the handle for Moving Average indicator
+  //--- Get the handle for Moving Average indicator
   movingAverageHandler = iMA(_Symbol, _Period, movingAveragePeriod, 0, MODE_EMA, PRICE_CLOSE);
 
   //--- What if handle returns Invalid Handle
@@ -50,7 +48,7 @@ int OnInit()
   {
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
   }
-  
+
   return (INIT_SUCCEEDED);
 }
 
@@ -83,15 +81,15 @@ void OnTick()
     ResetLastError();
     return;
   }
-  
+
   if (isNewBar == true)
-  { 
+  {
     if (barsSinceLastTrade > barIntervalThreshold)
     {
       tradeBarCounterActive = false;
       barsSinceLastTrade = 0;
     }
-    
+
     if (tradeBarCounterActive == true)
     {
       barsSinceLastTrade = barsSinceLastTrade + 1;
@@ -99,13 +97,13 @@ void OnTick()
 
     positionTakenThisBar = false;
   }
-  
+
   MqlTick latestPriceDetails;   // To be used for getting recent/latest price quotes
   MqlTradeRequest tradeRequest; // To be used for sending our trade requests
   MqlTradeResult tradeResult;   // To be used to get our trade results
   MqlRates barDetails[];        // To be used to store the prices, volumes and spread of each bar
   ZeroMemory(tradeRequest);     // Initialization of tradeRequest struct
-  
+
   // the bar details arrays
   ArraySetAsSeries(barDetails, true);
   // the MA-8 values arrays
@@ -114,7 +112,7 @@ void OnTick()
   ArraySetAsSeries(volume, true);
   // the volume array
   ArraySetAsSeries(rsi, true);
-  
+
   //--- Get the last price quote using the MQL5 MqlTick Structure
   if (!SymbolInfoTick(_Symbol, latestPriceDetails))
   {
@@ -133,18 +131,18 @@ void OnTick()
     Alert("Error copying Moving Average indicator buffer - error:", GetLastError());
     return;
   }
-  
+
   //--- Get the details of the latest 5 volumes
   CopyBuffer(iVolumes(_Symbol, _Period, VOLUME_TICK), 0, 0, 6, volume);
-  
+
   //--- Get the details of the latest 5 volumes
   CopyBuffer(iRSI(_Symbol, _Period, 14, PRICE_CLOSE), 0, 0, 6, rsi);
 
-  //--- We have no errors, so continue to trading  
+  //--- We have no errors, so continue to trading
 
-   Comment("Volume of Current bar: " + volume[0]      + 
-          "\nVolume of Current bar -1: " + volume[1]  + 
-          "\nVolume of Current bar -2: " + volume[2]);  
+  Comment("Volume of Current bar: " + volume[0] +
+          "\nVolume of Current bar -1: " + volume[1] +
+          "\nVolume of Current bar -2: " + volume[2]);
 
   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
@@ -154,14 +152,13 @@ void OnTick()
   {
     if (weirdRevertLong == true)
     {
-      tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);    
+      tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask);
     }
     else
     {
-      tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);
+      tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid);
     }
-  
-  
+
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
     {
       positionTakenThisBar = true;
@@ -173,27 +170,27 @@ void OnTick()
     {
       if (weirdRevertLong == true)
       {
-        Alert("The Buy (SELL) order request (price: " + bid + ") could not be completed -error:", GetLastError());   
+        Alert("The Buy (SELL) order request (price: " + bid + ") could not be completed -error:", GetLastError());
       }
       else
-      {  
+      {
         Alert("The Buy order request (price: " + ask + ") could not be completed -error:", GetLastError());
       }
-      
+
       ResetLastError();
       return;
     }
   }
-  
+
   if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3BlackCrows(barDetails, bid))
   {
     if (weirdRevertShort == true)
     {
-      tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid, stopLossPrice, barDetails[4].open);    
+      tradeResult = MakeLongTrade(tradeRequest, tradeResult, bid);
     }
     else
     {
-      tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask, stopLossPrice, barDetails[4].open);
+      tradeResult = MakeShortTrade(tradeRequest, tradeResult, ask);
     }
 
     if (tradeResult.retcode == 10009 || tradeResult.retcode == 10008) //Request is completed or order placed
@@ -206,18 +203,18 @@ void OnTick()
     {
       if (weirdRevertShort == true)
       {
-        Alert("The Sell (BUY) order request (price: " + ask + ") could not be completed -error:", GetLastError());   
+        Alert("The Sell (BUY) order request (price: " + ask + ") could not be completed -error:", GetLastError());
       }
       else
-      {  
+      {
         Alert("The Sell order request (price: " + bid + ") could not be completed -error:", GetLastError());
       }
-      
+
       ResetLastError();
       return;
     }
   }
-    
+
   isNewBar = false;
 }
 
@@ -229,61 +226,61 @@ bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
   double barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
   if (barBeforeFirstLargeGreenBarDistance < 0)
   {
-   barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
+    barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
   }
-  
+
   //For easier debugging of which statement is incorrect
-  if (currentTime == "2019.10.03 05:34")
+  if (currentTime == "2020.04.15 15:30")
   {
     Alert("Debugging Time");
-  }  
-  
+  }
+
   //Check bars are correct type
-  if (firstLargeGreenBarDistance <= 0 || secondLargeGreenBarDistance <= 0 || thirdLargeGreenBarDistance <= 0)  
+  if (firstLargeGreenBarDistance <= 0 || secondLargeGreenBarDistance <= 0 || thirdLargeGreenBarDistance <= 0)
   {
     return false;
-  }  
-  
+  }
+
   //third green bar close must be X above second green close, second green close must be X above first green close
   //AND third green bar open must be X above second green open, second green open must be X above first green open
-  if (!(barDetails[2].close >  (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close >  (barDetails[4].close + (closeDistance * _Point))) ||
-      !(barDetails[2].open >  (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close >  (barDetails[4].close + (openDistance * _Point))))  
+  if (!(barDetails[2].close > (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close > (barDetails[4].close + (closeDistance * _Point))) ||
+      !(barDetails[2].open > (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close > (barDetails[4].close + (openDistance * _Point))))
   {
     return false;
-  }  
-  
+  }
+
   //Bars must be X number of points
   if ((firstLargeGreenBarDistance < (minPoints * _Point)) || (secondLargeGreenBarDistance < (minPoints * _Point)) || (thirdLargeGreenBarDistance < (minPoints * _Point)))
   {
-   return false;
-  } 
-  
-  //Wicks must be < than Xth of Bar 
+    return false;
+  }
+
+  //Wicks must be < than Xth of Bar
   if (barWickSize > 0)
   {
-   if (!((barDetails[4].high - barDetails[4].close) < (firstLargeGreenBarDistance / barWickSize))  ||
-       !((barDetails[4].open - barDetails[4].low) < (firstLargeGreenBarDistance / barWickSize))    ||
-       !((barDetails[3].high - barDetails[3].close) < (secondLargeGreenBarDistance / barWickSize)) ||
-       !((barDetails[3].open - barDetails[3].low) < (secondLargeGreenBarDistance / barWickSize))   ||
-       !((barDetails[2].high - barDetails[2].close) < (thirdLargeGreenBarDistance / barWickSize))  ||
-       !((barDetails[2].open - barDetails[2].low) < (thirdLargeGreenBarDistance / barWickSize)))
-   {
-    return false;
-   }
-  } 
-  
+    if (!((barDetails[4].high - barDetails[4].close) < (firstLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[4].open - barDetails[4].low) < (firstLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[3].high - barDetails[3].close) < (secondLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[3].open - barDetails[3].low) < (secondLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[2].high - barDetails[2].close) < (thirdLargeGreenBarDistance / barWickSize)) ||
+        !((barDetails[2].open - barDetails[2].low) < (thirdLargeGreenBarDistance / barWickSize)))
+    {
+      return false;
+    }
+  }
+
   //Conf bar must be Green bar
   if ((barDetails[1].close - barDetails[1].open) <= 0)
   {
-   return false;
+    return false;
   }
-  
+
   //Take position after price has reached Final Green candles close + X points
   if (takePositionThreshold > 0 && !(ask <= (barDetails[2].high + (takePositionThreshold * _Point))))
   {
-   return false;
-  }    
-  
+    return false;
+  }
+
   return true;
 }
 
@@ -295,77 +292,106 @@ bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
   double barBeforeFirstLargeGreenBarDistance = barDetails[5].open - barDetails[5].close;
   if (barBeforeFirstLargeGreenBarDistance < 0)
   {
-   barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
+    barBeforeFirstLargeGreenBarDistance = barDetails[5].close - barDetails[5].open;
   }
-  
+
   //For easier debugging of which statement is incorrect
-  if (currentTime == "2019.10.03 05:34")
+  if (currentTime == "2020.04.15 15:30")
   {
     Alert("Debugging Time");
-  }  
-  
+  }
+
   //Check bars are correct type
-  if (firstLargeRedBarDistance <= 0 || secondLargeRedBarDistance <= 0 || thirdLargeRedBarDistance <= 0)  
+  if (firstLargeRedBarDistance <= 0 || secondLargeRedBarDistance <= 0 || thirdLargeRedBarDistance <= 0)
   {
     return false;
-  }  
-  
+  }
+
   //third red bar close must be X below second red close, second red close must be X below first red close
   //AND third red bar open must be X below second red open, second red open must be X below first red open
-  if (!(barDetails[2].close <  (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close <  (barDetails[4].close + (closeDistance * _Point))) ||
-      !(barDetails[2].open <  (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close <  (barDetails[4].close + (openDistance * _Point))))  
+  if (!(barDetails[2].close < (barDetails[3].close + (closeDistance * _Point))) || !(barDetails[3].close < (barDetails[4].close + (closeDistance * _Point))) ||
+      !(barDetails[2].open < (barDetails[3].open + (openDistance * _Point))) || !(barDetails[3].close < (barDetails[4].close + (openDistance * _Point))))
   {
     return false;
-  }  
-  
+  }
+
   //Bars must be X number of points
   if ((firstLargeRedBarDistance < (minPoints * _Point)) || (secondLargeRedBarDistance < (minPoints * _Point)) || (thirdLargeRedBarDistance < (minPoints * _Point)))
   {
-   return false;
-  } 
-  
-  //Wicks must be < than Xth of Bar 
+    return false;
+  }
+
+  //Wicks must be < than Xth of Bar
   if (barWickSize > 0)
   {
-   if (!((barDetails[4].high - barDetails[4].open) < (firstLargeRedBarDistance / barWickSize))  ||
-       !((barDetails[4].close - barDetails[4].low) < (firstLargeRedBarDistance / barWickSize))    ||
-       !((barDetails[3].high - barDetails[3].open) < (secondLargeRedBarDistance / barWickSize)) ||
-       !((barDetails[3].close - barDetails[3].low) < (secondLargeRedBarDistance / barWickSize))   ||
-       !((barDetails[2].high - barDetails[2].open) < (thirdLargeRedBarDistance / barWickSize))  ||
-       !((barDetails[2].close - barDetails[2].low) < (thirdLargeRedBarDistance / barWickSize)))
-   {
-    return false;
-   }
-  } 
-  
+    if (!((barDetails[4].high - barDetails[4].open) < (firstLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[4].close - barDetails[4].low) < (firstLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[3].high - barDetails[3].open) < (secondLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[3].close - barDetails[3].low) < (secondLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[2].high - barDetails[2].open) < (thirdLargeRedBarDistance / barWickSize)) ||
+        !((barDetails[2].close - barDetails[2].low) < (thirdLargeRedBarDistance / barWickSize)))
+    {
+      return false;
+    }
+  }
+
   //Conf bar must be Red bar
   if ((barDetails[1].open - barDetails[1].close) <= 0)
   {
-   return false;
+    return false;
   }
-  
+
   //Take position after price has reached Final Red candles close - X points
   if (takePositionThreshold > 0 && !(bid >= (barDetails[2].low - (takePositionThreshold * _Point))))
   {
-   return false;
-  }    
-  
+    return false;
+  }
+
   return true;
 }
 
-MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid, bool stopLossPrice, double firstBarOpenPrice)
+void GetTrades()
+{
+  datetime to = TimeCurrent();
+  datetime from = to - (PeriodSeconds(PERIOD_D1) * 7); //check deals for the past 7 days
+  ResetLastError();
+  if (!HistorySelect(0, to))
+  {
+    Print(__FUNCTION__, " HistorySelect=false. Error code=", GetLastError());
+  }
+  
+  int totalDeals = HistoryDealsTotal();
+  long ticket = 0;
+  
+  for (int i = 0; i < totalDeals; i++)
+  {
+    if((ticket=HistoryDealGetTicket(i))>0)
+    {
+      price =HistoryDealGetDouble(ticket,DEAL_PRICE);
+      time  =(datetime)HistoryDealGetInteger(ticket,DEAL_TIME);
+      symbol=HistoryDealGetString(ticket,DEAL_SYMBOL);
+      type  =HistoryDealGetInteger(ticket,DEAL_TYPE);
+      entry =HistoryDealGetInteger(ticket,DEAL_ENTRY);
+      profit=HistoryDealGetDouble(ticket,DEAL_PROFIT);
+      
+      if (EnumToString(HistoryDealGetInteger(ticket, DEAL_REASON)) == "DEAL_REASON_SL")
+      {
+        Print("STOP LOSS HIT: ticket ", ticket, "  triggered SL");
+      }
+      else if (EnumToString(HistoryDealGetInteger(ticket, DEAL_REASON)) == "DEAL_REASON_TP")
+      {  
+        Print("TAKE PROFIT HIT: ticket ", ticket, "  triggered TP");
+      }
+    }
+  }
+}
+
+MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double bid)
 {
   tradeRequest.action = TRADE_ACTION_DEAL; // immediate order execution
 
-  if (stopLossPrice)
-  {
-   tradeRequest.sl = NormalizeDouble(firstBarOpenPrice, _Digits);
-  }
-  else
-  {
-   tradeRequest.sl = NormalizeDouble(bid - stopLoss * _Point, _Digits);
-  }
-  
+  tradeRequest.sl = NormalizeDouble(bid - stopLoss * _Point, _Digits);
+
   tradeRequest.tp = NormalizeDouble(bid + takeProfit * _Point, _Digits);
 
   tradeRequest.symbol = _Symbol;                 // currency pair
@@ -374,24 +400,20 @@ MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &trad
   tradeRequest.type = ORDER_TYPE_BUY;            // Buy Order
   tradeRequest.type_filling = ORDER_FILLING_FOK; // Order execution type
   tradeRequest.deviation = 10;
+  
+  tradeRequest.comment = "";
+  
   OrderSend(tradeRequest, tradeResult);
 
   return tradeResult;
 }
 
-MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double ask, bool stopLossPrice, double babyBarClosePrice)
+MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tradeResult, double ask)
 {
   tradeRequest.action = TRADE_ACTION_DEAL;
 
-  if (stopLossPrice)
-  {
-   tradeRequest.sl = NormalizeDouble(stopLossPrice, _Digits);
-  }
-  else
-  {
-   tradeRequest.sl = NormalizeDouble(ask + stopLoss * _Point, _Digits);
-  }
-  
+  tradeRequest.sl = NormalizeDouble(ask + stopLoss * _Point, _Digits);
+
   tradeRequest.tp = NormalizeDouble(ask - takeProfit * _Point, _Digits);
 
   tradeRequest.symbol = _Symbol;                 // currency pair
@@ -400,6 +422,9 @@ MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tra
   tradeRequest.type = ORDER_TYPE_SELL;           // Buy Order
   tradeRequest.type_filling = ORDER_FILLING_FOK; // Order execution type
   tradeRequest.deviation = 10;
+  
+  tradeRequest.comment = "";
+  
   OrderSend(tradeRequest, tradeResult);
 
   return tradeResult;
