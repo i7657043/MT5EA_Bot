@@ -17,6 +17,14 @@ input double minPoints = 2;             //Each bar must be > X number of points
 input double barWickSize = 1;           //Higher Number = Smaller Wicks
 input bool waitForConfBar = true;       //Wait for Conf bar
 
+input int rsiLongUpperLimit=0;          //Long RSI Upper limit CA - Upper 100
+input int rsiLongLowerLimit=0;          //Long RSI Lower limit CA - Lower 0
+input int rsiShortUpperLimit=0;         //Short RSI Upper limit CA - Upper 100
+input int rsiShortLowerLimit=0;         //Short RSI Lower limit CA - Lower 0
+ 
+input int upperStochLimit=0;          //Stoch Upper limit CA - Upper 0
+input int lowerStochLimit=0;          //Stoch Lower limit CA - Lower 100
+
 input bool makeShortTrades = false;     //Make Short trades
 input bool makeLongTrades = false;      //Make Long trades
 input bool weirdRevertLong = false;     //Short when Signals say Long
@@ -31,6 +39,9 @@ double movingAverages[];  // Dynamic array to hold the values of Moving Average 
 
 double volume[];
 double rsi[];
+
+double stoch_K[];
+double stoch_D[];
 
 string currentTime = "";
 bool isNewBar = false;
@@ -115,6 +126,10 @@ void OnTick()
   ArraySetAsSeries(volume, true);
   // the volume array
   ArraySetAsSeries(rsi, true);
+  // the stoch K array
+  ArraySetAsSeries(stoch_K, true);
+  // the stoch D array
+  ArraySetAsSeries(stoch_D, true);
 
   //--- Get the last price quote using the MQL5 MqlTick Structure
   if (!SymbolInfoTick(_Symbol, latestPriceDetails))
@@ -123,7 +138,7 @@ void OnTick()
     return;
   }
 
-  //--- Get the details of the latest 5 bars and MA
+  //--- Get the details of the latest 6 bars and MA
   if (CopyRates(_Symbol, _Period, 0, 6, barDetails) < 0)
   {
     Alert("Error copying rates/history data - error:", GetLastError(), "!!");
@@ -135,23 +150,27 @@ void OnTick()
     return;
   }
 
-  //--- Get the details of the latest 5 volumes
+  //--- Get the details of the latest 6 volumes
   CopyBuffer(iVolumes(_Symbol, _Period, VOLUME_TICK), 0, 0, 6, volume);
 
-  //--- Get the details of the latest 5 volumes
+  //--- Get the details of the latest 6 volumes
   CopyBuffer(iRSI(_Symbol, _Period, 14, PRICE_CLOSE), 0, 0, 6, rsi);
+  
+  //--- Get the details of the latest 6 stochs
+  int stochDefinition = iStochastic(_Symbol, _Period, 5, 6, 3, MODE_SMA, STO_LOWHIGH);
+  CopyBuffer(stochDefinition, 0, 0, 6,stoch_K);
+  CopyBuffer(stochDefinition, 1, 0, 6, stoch_D);
 
   //--- We have no errors, so continue to trading
 
-  Comment("Volume of Current bar: " + volume[0] +
-          "\nVolume of Current bar -1: " + volume[1] +
-          "\nVolume of Current bar -2: " + volume[2]);
+  Comment("Stoch K: " + stoch_K[0] + 
+          "\nStoch D: " + stoch_D[0]);          
 
   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
   int spread = (int)MathRound((ask - bid) / SymbolInfoDouble(Symbol(), SYMBOL_POINT));
 
-  if (makeLongTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3WhiteSoldiers(barDetails, ask))
+  if (makeLongTrades == true && checkRsiLong(rsi, rsiLongLowerLimit, rsiLongUpperLimit) && checkStochLong(stoch_K, stoch_D, lowerStochLimit, upperStochLimit) && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3WhiteSoldiers(barDetails, ask))
   {
     if (weirdRevertLong == true)
     {
@@ -185,7 +204,7 @@ void OnTick()
     }
   }
 
-  if (makeShortTrades == true && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3BlackCrows(barDetails, bid))
+  if (makeShortTrades == true && checkRsiShort(rsi, rsiShortLowerLimit, rsiShortUpperLimit)  && checkStochShort(stoch_K, stoch_D, lowerStochLimit, upperStochLimit) && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3BlackCrows(barDetails, bid))
   {
     if (weirdRevertShort == true)
     {
@@ -221,6 +240,57 @@ void OnTick()
   isNewBar = false;
 }
 
+//Stoch check value is above the Upper limit or below the lower Limit
+//Catch all - Lower 100, Upper 0
+bool checkStochLong(double &stoch_K[], double &stoch_D[], double lowerStochLimit, double upperStochLimit)
+{
+  if (weirdRevertLong == true)
+  {
+    return stoch_K[0] > upperStochLimit;
+  }
+  else
+  {
+    return stoch_K[0] < lowerStochLimit;
+  }
+}
+bool checkStochShort(double &stoch_K[], double &stoch_D[], double lowerStochLimit, double upperStochLimit)
+{
+  if (weirdRevertShort == true)
+  {
+    return stoch_K[0] < lowerStochLimit;
+  }
+  else
+  {
+    return stoch_K[0] > upperStochLimit;
+  }  
+}
+
+//RSI check value is below the Upper Limit and above the Lower limit
+//Catch all - Upper 100, Lower 0
+bool checkRsiLong(double &rsi[], double rsiLongLowerLimit, double rsiLongUpperLimit)
+{
+  if (weirdRevertLong == true)
+  {
+    return (rsi[0] > rsiShortLowerLimit) && (rsi[0] < rsiShortUpperLimit);
+  }
+  else
+  {
+    return (rsi[0] > rsiLongLowerLimit) && (rsi[0] < rsiLongUpperLimit);
+  }  
+}
+bool checkRsiShort(double &rsi[], double rsiShortLowerLimit, double rsiShortUpperLimit)
+{
+  if (weirdRevertShort == true)
+  {
+    return (rsi[0] > rsiLongLowerLimit) && (rsi[0] < rsiLongUpperLimit);
+  }
+  else
+  {  
+    return (rsi[0] > rsiShortLowerLimit) && (rsi[0] < rsiShortUpperLimit);
+  }
+  
+}
+
 bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
 {
   double firstLargeGreenBarDistance = barDetails[4].close - barDetails[4].open;
@@ -233,7 +303,7 @@ bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
   }
 
   //For easier debugging of which statement is incorrect
-  if (currentTime == "2020.04.15 15:30")
+  if (currentTime == "2020.05.14 05:09")
   {
     Alert("Debugging Time");
   }
@@ -299,7 +369,7 @@ bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
   }
 
   //For easier debugging of which statement is incorrect
-  if (currentTime == "2020.04.15 15:30")
+  if (currentTime == "2019.05.14 05:09")
   {
     Alert("Debugging Time");
   }
@@ -416,7 +486,7 @@ MqlTradeResult MakeLongTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &trad
   tradeRequest.type_filling = ORDER_FILLING_FOK; // Order execution type
   tradeRequest.deviation = 10;
   
-  tradeRequest.comment = "";
+  tradeRequest.comment = "STOCH_K: " + stoch_K[0] + " :: STOCH_D: " + stoch_D[0];
   
   OrderSend(tradeRequest, tradeResult);
 
@@ -438,7 +508,7 @@ MqlTradeResult MakeShortTrade(MqlTradeRequest &tradeRequest, MqlTradeResult &tra
   tradeRequest.type_filling = ORDER_FILLING_FOK; // Order execution type
   tradeRequest.deviation = 10;
   
-  tradeRequest.comment = "";
+  tradeRequest.comment = "STOCH_K: " + stoch_K[0] + " :: STOCH_D: " + stoch_D[0];
   
   OrderSend(tradeRequest, tradeResult);
 
