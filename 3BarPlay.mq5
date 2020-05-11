@@ -17,10 +17,8 @@ input double minPoints = 2;             //Each bar must be > X number of points
 input double barWickSize = 1;           //Higher Number = Smaller Wicks
 input bool waitForConfBar = true;       //Wait for Conf bar
 
-input int rsiLongUpperLimit=0;          //Long RSI Upper limit CA - Upper 100
-input int rsiLongLowerLimit=0;          //Long RSI Lower limit CA - Lower 0
-input int rsiShortUpperLimit=0;         //Short RSI Upper limit CA - Upper 100
-input int rsiShortLowerLimit=0;         //Short RSI Lower limit CA - Lower 0
+input int rsiUpperLimit=0;          //Long RSI Upper limit CA - Upper 100
+input int rsiLowerLimit=0;          //Long RSI Lower limit CA - Lower 0
  
 input int upperStochLimit=0;          //Stoch Upper limit CA - Upper 0
 input int lowerStochLimit=0;          //Stoch Lower limit CA - Lower 100
@@ -170,7 +168,7 @@ void OnTick()
   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
   int spread = (int)MathRound((ask - bid) / SymbolInfoDouble(Symbol(), SYMBOL_POINT));
 
-  if (makeLongTrades == true && checkRsiLong(rsi, rsiLongLowerLimit, rsiLongUpperLimit) && checkStochLong(stoch_K, stoch_D, lowerStochLimit, upperStochLimit) && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3WhiteSoldiers(barDetails, ask))
+  if (makeLongTrades == true && checkRsiLong(rsi, rsiLowerLimit, rsiUpperLimit) && checkStochLong(stoch_K, stoch_D, lowerStochLimit, upperStochLimit) && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3WhiteSoldiers(barDetails, ask))
   {
     if (weirdRevertLong == true)
     {
@@ -204,7 +202,7 @@ void OnTick()
     }
   }
 
-  if (makeShortTrades == true && checkRsiShort(rsi, rsiShortLowerLimit, rsiShortUpperLimit)  && checkStochShort(stoch_K, stoch_D, lowerStochLimit, upperStochLimit) && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3BlackCrows(barDetails, bid))
+  if (makeShortTrades == true && checkRsiShort(rsi, rsiLowerLimit, rsiUpperLimit)  && checkStochShort(stoch_K, stoch_D, lowerStochLimit, upperStochLimit) && tradeBarCounterActive == false && positionTakenThisBar == false && CheckFor3BlackCrows(barDetails, bid))
   {
     if (weirdRevertShort == true)
     {
@@ -267,26 +265,26 @@ bool checkStochShort(double &stoch_K[], double &stoch_D[], double lowerStochLimi
 
 //RSI check value is below the Upper Limit and above the Lower limit
 //Catch all - Upper 100, Lower 0
-bool checkRsiLong(double &rsi[], double rsiLongLowerLimit, double rsiLongUpperLimit)
+bool checkRsiLong(double &rsi[], double rsiLowerLimit, double rsiUpperLimit)
 {
   if (weirdRevertLong == true)
   {
-    return (rsi[0] > rsiShortLowerLimit) && (rsi[0] < rsiShortUpperLimit);
+    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
   }
   else
   {
-    return (rsi[0] > rsiLongLowerLimit) && (rsi[0] < rsiLongUpperLimit);
+    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
   }  
 }
-bool checkRsiShort(double &rsi[], double rsiShortLowerLimit, double rsiShortUpperLimit)
+bool checkRsiShort(double &rsi[], double rsiLowerLimit, double rsiUpperLimit)
 {
   if (weirdRevertShort == true)
   {
-    return (rsi[0] > rsiLongLowerLimit) && (rsi[0] < rsiLongUpperLimit);
+    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
   }
   else
   {  
-    return (rsi[0] > rsiShortLowerLimit) && (rsi[0] < rsiShortUpperLimit);
+    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
   }
   
 }
