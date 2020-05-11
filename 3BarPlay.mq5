@@ -17,11 +17,11 @@ input double minPoints = 2;             //Each bar must be > X number of points
 input double barWickSize = 1;           //Higher Number = Smaller Wicks
 input bool waitForConfBar = true;       //Wait for Conf bar
 
-input int rsiUpperLimit=0;          //Long RSI Upper limit CA - Upper 100
-input int rsiLowerLimit=0;          //Long RSI Lower limit CA - Lower 0
+input int rsiUpperLimit=0;          //RSI must be above X
+input int rsiLowerLimit=0;          //RSI must be below X
  
-input int upperStochLimit=0;          //Stoch Upper limit CA - Upper 0
-input int lowerStochLimit=0;          //Stoch Lower limit CA - Lower 100
+input int upperStochLimit=0;          //Stoch must be above X
+input int lowerStochLimit=0;          //Stoch must be below X
 
 input bool makeShortTrades = false;     //Make Short trades
 input bool makeLongTrades = false;      //Make Long trades
@@ -239,7 +239,6 @@ void OnTick()
 }
 
 //Stoch check value is above the Upper limit or below the lower Limit
-//Catch all - Lower 100, Upper 0
 bool checkStochLong(double &stoch_K[], double &stoch_D[], double lowerStochLimit, double upperStochLimit)
 {
   if (weirdRevertLong == true)
@@ -264,27 +263,26 @@ bool checkStochShort(double &stoch_K[], double &stoch_D[], double lowerStochLimi
 }
 
 //RSI check value is below the Upper Limit and above the Lower limit
-//Catch all - Upper 100, Lower 0
 bool checkRsiLong(double &rsi[], double rsiLowerLimit, double rsiUpperLimit)
 {
   if (weirdRevertLong == true)
   {
-    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
+    return rsi[0] > rsiUpperLimit;
   }
   else
   {
-    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
+    return rsi[0] < rsiLowerLimit;
   }  
 }
 bool checkRsiShort(double &rsi[], double rsiLowerLimit, double rsiUpperLimit)
 {
   if (weirdRevertShort == true)
   {
-    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
+    return rsi[0] < rsiLowerLimit;
   }
   else
   {  
-    return (rsi[0] > rsiLowerLimit) && (rsi[0] < rsiUpperLimit);
+    return rsi[0] > rsiUpperLimit;
   }
   
 }
