@@ -4,10 +4,10 @@
 //|                                                             None |
 //+------------------------------------------------------------------+
 //--- input parameters
-input int stopLoss = 64;            //Stop Loss
-input int takeProfit = 113;         //Take Profit
-input double lotSize = 0.01;        //Lot Size
-input int barIntervalThreshold = 6; // Bar Trade interval
+input int stopLossChosen = 64;            //Stop Loss
+input int takeProfitChosen = 113;         //Take Profit
+input double lotSize = 0.01;              //Lot Size
+input int barIntervalThreshold = 6;       // Bar Trade interval
 
 //---Optimisation input parameters
 input double takePositionThreshold = 2; //Enter after price = final bar close + X points
@@ -48,6 +48,9 @@ bool positionTakenThisBar = false;
 bool tradeBarCounterActive = 0;
 int barsSinceLastTrade = 0;
 
+int stopLoss=0;        //Modifiable Stop Loss as input value is read only
+int takeProfit=0;      //Modifiable Take Profit as input value is read only
+
 int OnInit()
 {
   //--- Get the handle for Moving Average indicator
@@ -57,9 +60,22 @@ int OnInit()
   if (movingAverageHandler < 0)
   {
     Alert("Error Creating Handles for indicators - error: ", GetLastError(), "!!");
-  }
+  }  
   
-  Alert("STOP LOSS MIN: " + SymbolInfoInteger(_Symbol,SYMBOL_TRADE_STOPS_LEVEL));
+  if (stopLossChosen < SymbolInfoInteger(_Symbol,SYMBOL_TRADE_STOPS_LEVEL))
+  {
+    stopLoss = SymbolInfoInteger(_Symbol,SYMBOL_TRADE_STOPS_LEVEL);    
+    takeProfit = stopLoss * 2;
+      
+    Alert("DEFAULT STOP LOSS: " + stopLoss + " :: DEFAULT TAKE PROFIT: " + takeProfit);
+  }
+  else
+  {
+    stopLoss = stopLossChosen;
+    takeProfit = takeProfitChosen;
+    
+    Alert("CUSTOM STOP LOSS: " + stopLoss + " :: CUSTOM TAKE PROFIT: " + takeProfit);
+  }
   
   return (INIT_SUCCEEDED);
 }
@@ -345,7 +361,7 @@ bool CheckFor3WhiteSoldiers(MqlRates &barDetails[], double ask)
   }
 
   //Take position after price has reached Final Green candles close + X points
-  if (takePositionThreshold > 0 && !(ask <= (barDetails[2].high + (takePositionThreshold * _Point))))
+  if (takePositionThreshold > 0 && !(ask >= (barDetails[2].high + (takePositionThreshold * _Point))))
   {
     return false;
   }
@@ -410,8 +426,8 @@ bool CheckFor3BlackCrows(MqlRates &barDetails[], double bid)
     return false;
   }
 
-  //Take position after price has reached Final Red candles close - X points
-  if (takePositionThreshold > 0 && !(bid >= (barDetails[2].low - (takePositionThreshold * _Point))))
+  //Take position after price has reached Final Red candles low - X points
+  if (takePositionThreshold > 0 && !(bid <= (barDetails[2].low - (takePositionThreshold * _Point))))
   {
     return false;
   }
